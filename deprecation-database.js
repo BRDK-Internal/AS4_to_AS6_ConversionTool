@@ -112,6 +112,91 @@ const DeprecationDatabase = {
             '.ncm': { name: 'NC Axis Mapping', language: null },
             '.ncc': { name: 'NC Configuration', language: null },
             '.dob': { name: 'Data Object', language: 'Ax' }
+        },
+        
+        // Library to Technology Package mapping for AS6 upgrades
+        // Maps AS4 5.x libraries to their AS6 6.x equivalents
+        libraryMapping: {
+            // mappServices (6.0.0) - Data management and services
+            'MpAlarmX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpAudit': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpBackup': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpCodeBox': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpCom': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpData': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpDatabase': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpFile': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpIO': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpRecipe': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpReport': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpSequence': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpUserX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // mappView (6.0.0) - Visualization
+            'MpServer': { techPackage: 'mappView', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // mappMotion (6.0.0) - Motion control
+            'MpAxis': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpCnc': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpRobotics': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'McAcpAx': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'McAxis': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'McBase': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // mappControl (6.0.0) - Advanced control
+            'MpTemp': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // mappCockpit (6.0.0) - Diagnostics
+            'CoTrace': { techPackage: 'mappCockpit', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // Acp10Arnc0 (6.0.0) - ACOPOS motion (note: library versions use 6.00.0 format)
+            'Acp10_MC': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            'Acp10man': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            'Acp10par': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            'Acp10sim': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            'NcGlobal': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            
+            // MpBase - Core mapp component (included with most tech packages)
+            'MpBase': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            
+            // MTTypes/MTData - Motion toolbox (Library_2)
+            'MTTypes': { source: 'Library_2', as6LibVersion: null },
+            'MTData': { source: 'Library_2', as6LibVersion: null },
+            'MTAdvanced': { source: 'Library_2', as6LibVersion: null },
+            'MTSystem': { source: 'Library_2', as6LibVersion: null },
+            'MTTemp': { source: 'Library_2', as6LibVersion: null },
+            
+            // Core runtime libraries (Library_2 - no version, bundled with AR)
+            'runtime': { source: 'Library_2', as6LibVersion: null },
+            'brsystem': { source: 'Library_2', as6LibVersion: null },
+            'sys_lib': { source: 'Library_2', as6LibVersion: null },
+            'standard': { source: 'Library_2', as6LibVersion: null },
+            'operator': { source: 'Library_2', as6LibVersion: null },
+            'astime': { source: 'Library_2', as6LibVersion: null },
+            'FileIO': { source: 'Library_2', as6LibVersion: null },
+            'DataObj': { source: 'Library_2', as6LibVersion: null },
+            'AsSem': { source: 'Library_2', as6LibVersion: null },
+            'AsBrMath': { source: 'Library_2', as6LibVersion: null },
+            'AsBrStr': { source: 'Library_2', as6LibVersion: null },
+            'AsBrWStr': { source: 'Library_2', as6LibVersion: null },
+            'AsIO': { source: 'Library_2', as6LibVersion: null },
+            'AsIODiag': { source: 'Library_2', as6LibVersion: null },
+            'AsUSB': { source: 'Library_2', as6LibVersion: null },
+            'AsWeigh': { source: 'Library_2', as6LibVersion: null },
+            'AsTCP': { source: 'Library_2', as6LibVersion: null },
+            'AsUDP': { source: 'Library_2', as6LibVersion: null },
+            'AsHttp': { source: 'Library_2', as6LibVersion: null },
+            'AsXml': { source: 'Library_2', as6LibVersion: null },
+            'AsZip': { source: 'Library_2', as6LibVersion: null },
+            'AsMem': { source: 'Library_2', as6LibVersion: null },
+            'AsOpcUac': { source: 'Library_2', as6LibVersion: null },
+            'AsOpcUas': { source: 'Library_2', as6LibVersion: null },
+            'AsIecCon': { source: 'Library_2', as6LibVersion: null },
+            'ArEventLog': { source: 'Library_2', as6LibVersion: null },
+            'ArProject': { source: 'Library_2', as6LibVersion: null },
+            'ArUser': { source: 'Library_2', as6LibVersion: null },
+            'ArSsl': { source: 'Library_2', as6LibVersion: null },
+            'powerlnk': { source: 'Library_2', as6LibVersion: null }
         }
     },
 

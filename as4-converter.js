@@ -101,6 +101,7 @@ class AS4Converter {
             totalFiles: document.getElementById('totalFiles'),
             stFiles: document.getElementById('stFiles'),
             pkgFiles: document.getElementById('pkgFiles'),
+            lbyFiles: document.getElementById('lbyFiles'),
             tmxFiles: document.getElementById('tmxFiles'),
             motionFiles: document.getElementById('motionFiles'),
             visFiles: document.getElementById('visFiles'),
@@ -583,6 +584,7 @@ class AS4Converter {
             total: this.projectFiles.size,
             st: 0,
             pkg: 0,
+            lby: 0,
             tmx: 0,
             motion: 0,
             hw: 0,
@@ -594,6 +596,8 @@ class AS4Converter {
                 stats.st++;
             } else if (file.type === 'package') {
                 stats.pkg++;
+            } else if (file.type === 'library_binary') {
+                stats.lby++;
             } else if (file.type === 'localization') {
                 stats.tmx++;
             } else if (file.type === 'axis_init' || file.type === 'axis_parameters' || 
@@ -609,6 +613,7 @@ class AS4Converter {
         this.elements.totalFiles.textContent = stats.total;
         this.elements.stFiles.textContent = stats.st;
         if (this.elements.pkgFiles) this.elements.pkgFiles.textContent = stats.pkg;
+        if (this.elements.lbyFiles) this.elements.lbyFiles.textContent = stats.lby;
         if (this.elements.tmxFiles) this.elements.tmxFiles.textContent = stats.tmx;
         if (this.elements.motionFiles) this.elements.motionFiles.textContent = stats.motion;
         if (this.elements.visFiles) this.elements.visFiles.textContent = stats.vis;
@@ -760,6 +765,9 @@ class AS4Converter {
                 break;
             case 'localization':
                 this.analyzeLocalizationFile(path, content);
+                break;
+            case 'library_binary':
+                this.analyzeLibraryFile(path, content);
                 break;
         }
     }
@@ -1400,6 +1408,106 @@ class AS4Converter {
         });
     }
 
+    // ==========================================
+    // LIBRARY FILE ANALYSIS (.lby)
+    // ==========================================
+    
+    analyzeLibraryFile(path, content) {
+        // Extract library name from path (e.g., "Libraries/MpAlarmX/Binary.lby" -> "MpAlarmX")
+        const pathParts = path.split(/[/\\]/);
+        const fileName = pathParts.pop(); // Binary.lby or similar
+        const libraryName = pathParts.pop(); // Library folder name
+        
+        // Parse library version from content
+        const versionMatch = content.match(/<Library\s+[^>]*Version="([^"]+)"/);
+        const version = versionMatch ? versionMatch[1] : null;
+        
+        // Skip if no version (e.g., custom user libraries without version)
+        if (!version) return;
+        
+        // Check if this is an AS4 5.x library that needs upgrading
+        const is5xVersion = version && version.match(/^5\.\d+/);
+        
+        // Look up library in mapping database
+        const mapping = DeprecationDatabase.as6Format.libraryMapping[libraryName];
+        
+        if (is5xVersion && mapping && mapping.techPackage) {
+            // Technology package library - should be removed from local Libraries folder
+            // AS6 will use the library from the installed technology package
+            this.addFinding({
+                type: 'library_version',
+                name: libraryName,
+                severity: 'warning',
+                description: `Library should be removed - provided by ${mapping.techPackage} technology package`,
+                replacement: {
+                    name: `${mapping.techPackage} ${mapping.as6Version}`,
+                    description: `Library is included in ${mapping.techPackage} technology package`
+                },
+                notes: `This library is part of the ${mapping.techPackage} technology package. ` +
+                       `In AS6, remove the local copy from Logical/Libraries and ensure the ` +
+                       `${mapping.techPackage} ${mapping.as6Version} technology package is installed. ` +
+                       `The library will be automatically available from the installed package.`,
+                file: path,
+                original: version,
+                conversion: {
+                    libraryName: libraryName,
+                    from: version,
+                    to: null, // Don't update version - library should be removed
+                    techPackage: mapping.techPackage,
+                    source: mapping.source,
+                    action: 'remove', // Mark for removal instead of version update
+                    automated: false // Manual action required
+                }
+            });
+        } else if (is5xVersion && mapping && mapping.source === 'Library_2') {
+            // Core runtime library - bundled with Automation Runtime
+            // Can be removed from local Libraries folder
+            this.addFinding({
+                type: 'library_version',
+                name: libraryName,
+                severity: 'info',
+                description: `Library bundled with Automation Runtime - local copy can be removed`,
+                replacement: {
+                    name: 'AR bundled',
+                    description: 'Library is bundled with Automation Runtime'
+                },
+                notes: `This library is bundled with the Automation Runtime. ` +
+                       `The local copy in Logical/Libraries can be removed. ` +
+                       `AS6 will use the library from the installed runtime.`,
+                file: path,
+                original: version,
+                conversion: {
+                    libraryName: libraryName,
+                    from: version,
+                    to: null,
+                    source: mapping.source,
+                    action: 'remove',
+                    automated: false
+                }
+            });
+        } else if (is5xVersion && !mapping) {
+            // Unknown 5.x library - might be user/custom library
+            this.addFinding({
+                type: 'library_version',
+                name: libraryName,
+                severity: 'info',
+                description: `Custom library with version ${version}`,
+                notes: 'This appears to be a custom/user library. Verify compatibility with AS6 GCC 11.3.0 compiler.',
+                file: path,
+                original: version
+            });
+        }
+        
+        // Store library info for cross-referencing with Cpu.sw
+        this.libraryVersions = this.libraryVersions || new Map();
+        this.libraryVersions.set(libraryName, {
+            path,
+            version,
+            mapping,
+            needsUpgrade: is5xVersion && mapping
+        });
+    }
+
     addFinding(finding) {
         const id = `finding_${this.analysisResults.length + 1}`;
         finding.id = id;
@@ -1901,6 +2009,44 @@ class AS4Converter {
                 new RegExp(`(AutomationRuntime\\s+Version=")${escapedFrom}(")`,'g'),
                 `$1${finding.conversion.to}$2`
             );
+        } else if (finding.type === 'library_version' && finding.conversion) {
+            // Library version handling
+            const conv = finding.conversion;
+            
+            if (conv.action === 'remove') {
+                // Mark library for removal from converted project
+                // Instead of modifying the file, we'll exclude it during download
+                this.librariesToRemove = this.librariesToRemove || new Set();
+                
+                // Get the library folder path (remove the filename from path)
+                const pathParts = finding.file.split(/[/\\]/);
+                pathParts.pop(); // Remove Binary.lby or similar
+                const libraryFolderPath = pathParts.join('/');
+                
+                this.librariesToRemove.add(libraryFolderPath);
+                this.librariesToRemove.add(conv.libraryName); // Also store library name for reference
+                
+                // Don't modify the content - just mark as applied
+                convertedContent = originalContent;
+                finding.notes = (finding.notes || '') + ' [Library will be excluded from converted project]';
+            } else if (conv.source === 'Library_2' && conv.to) {
+                // Library is bundled with AR - update version if specified
+                const escapedFrom = conv.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                convertedContent = originalContent.replace(
+                    new RegExp(`(<Library\\s+)Version="${escapedFrom}"`, 'g'),
+                    '$1'
+                );
+            } else if (conv.to) {
+                // Update version number (for custom libraries)
+                const escapedFrom = conv.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                convertedContent = originalContent.replace(
+                    new RegExp(`(<Library\\s+[^>]*Version=")${escapedFrom}(")`,'g'),
+                    `$1${conv.to}$2`
+                );
+            } else {
+                // No action needed
+                convertedContent = originalContent;
+            }
         } else {
             // Standard text replacement conversion
             const conversion = this.generateConversion(finding);
@@ -2288,9 +2434,28 @@ class AS4Converter {
         const projectFolder = zip.folder(projectName + '_AS6');
         
         // Add all project files with their directory structure
+        // Exclude libraries that are marked for removal (technology package libraries)
+        const removedLibraries = [];
         this.projectFiles.forEach((file, path) => {
-            // Preserve the directory structure
-            projectFolder.file(path, file.content);
+            // Check if this file is in a library folder marked for removal
+            let shouldExclude = false;
+            if (this.librariesToRemove && this.librariesToRemove.size > 0) {
+                for (const libPath of this.librariesToRemove) {
+                    // Check if path starts with the library folder path
+                    if (path.startsWith(libPath + '/') || path.startsWith(libPath + '\\') || path === libPath) {
+                        shouldExclude = true;
+                        if (!removedLibraries.includes(libPath)) {
+                            removedLibraries.push(libPath);
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            if (!shouldExclude) {
+                // Preserve the directory structure
+                projectFolder.file(path, file.content);
+            }
         });
         
         // Add AS6 structural changes info
@@ -2300,12 +2465,18 @@ class AS4Converter {
             sourceVersion: 'AS4.x',
             targetVersion: 'AS6.x',
             structuralChanges: structuralChanges,
+            removedLibraries: removedLibraries.length > 0 ? {
+                count: removedLibraries.length,
+                paths: removedLibraries,
+                reason: 'These libraries are provided by AS6 technology packages and should not be included in the project. Install the required technology packages in Automation Studio 6.'
+            } : null,
             notes: [
                 'This project has been converted from AS4 to AS6 format.',
                 'Review all changes before importing into Automation Studio 6.',
                 'Some manual adjustments may be required for hardware and library configurations.',
-                'New AS6 directories (AccessAndSecurity, Connectivity) may need to be created manually.'
-            ]
+                'New AS6 directories (AccessAndSecurity, Connectivity) may need to be created manually.',
+                removedLibraries.length > 0 ? `${removedLibraries.length} technology package libraries were removed. Install the required technology packages in AS6.` : null
+            ].filter(Boolean)
         }, null, 2));
         
         // Add conversion report as JSON
