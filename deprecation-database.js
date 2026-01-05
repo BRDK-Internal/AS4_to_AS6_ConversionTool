@@ -30,8 +30,10 @@ const DeprecationDatabase = {
         },
         
         // Automation Runtime version
+        // AS4 uses versions like B4.83, C4.93, D4.73, etc. (letter prefix + 4.xx)
+        // AS6 uses versions like 6.2.1
         automationRuntime: {
-            as4: { version: '4.93', description: 'AR 4.93 (AS4 typical)' },
+            as4: { versionPattern: /^[A-Z]?4\.\d+$/, description: 'AR 4.xx (AS4 series)' },
             as6: { version: '6.2.1', description: 'AR 6.2.1 (AS6 default)' }
         },
         
@@ -607,26 +609,6 @@ const DeprecationDatabase = {
             replacement: { name: "MpHydraulics", description: "mapp Hydraulics component" },
             notes: "Complete hydraulic control solution.",
             removedIn: "AS5.5"
-        },
-        {
-            id: "lib_acp10man",
-            name: "Acp10man",
-            severity: "warning",
-            category: "motion",
-            description: "ACOPOS manual mode library - legacy",
-            replacement: { name: "McAcpAx", description: "mapp Motion ACOPOS" },
-            notes: "Manual mode functions in mapp Motion.",
-            removedIn: "AS5.5"
-        },
-        {
-            id: "lib_acp10sim",
-            name: "Acp10sim",
-            severity: "info",
-            category: "motion",
-            description: "ACOPOS simulation library",
-            replacement: { name: "McAcpAx", description: "Simulation integrated in mapp Motion" },
-            notes: "Simulation capabilities built into mapp Motion.",
-            removedIn: "AS6.0"
         }
     ],
 

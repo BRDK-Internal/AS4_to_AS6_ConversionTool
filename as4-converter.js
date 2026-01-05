@@ -103,6 +103,7 @@ class AS4Converter {
             pkgFiles: document.getElementById('pkgFiles'),
             tmxFiles: document.getElementById('tmxFiles'),
             motionFiles: document.getElementById('motionFiles'),
+            visFiles: document.getElementById('visFiles'),
             hwFiles: document.getElementById('hwFiles'),
             
             // Analysis
@@ -284,7 +285,7 @@ class AS4Converter {
         // All supported B&R Automation Studio file extensions
         const relevantExtensions = [
             // Code files
-            '.st', '.fun', '.typ', '.var', '.prg',
+            '.st', '.fun', '.typ', '.var', '.prg', '.svar',
             // Hardware and config
             '.hw', '.hwl', '.sw', '.per',
             // Project and package
@@ -292,13 +293,40 @@ class AS4Converter {
             // Motion/Axis
             '.ax', '.apt', '.ncm', '.ncc', '.dob',
             // Localization
-            '.tmx',
+            '.tmx', '.textconfig', '.units',
             // I/O and mapping
             '.iom', '.vvm',
             // Libraries
-            '.lby'
+            '.lby', '.br',
+            // mappView / Visualization
+            '.content', '.eventbinding', '.binding', '.action',
+            '.page', '.layout', '.dialog', '.theme', '.styles',
+            '.vis', '.mappviewcfg', '.widgetlibrary', '.snippet',
+            // OPC UA
+            '.uaserver',
+            // mapp components
+            '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
+            // Security and access
+            '.role', '.user', '.firewallRules',
+            // DTM / Device configuration
+            '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
+            // Media/assets
+            '.jpg', '.svg', '.png',
+            // Documentation
+            '.md', '.doc'
         ];
+        // Folders to exclude (temp/build artifacts)
+        const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
+        
         const relevantFiles = files.filter(file => {
+            const filePath = file.relativePath || file.webkitRelativePath || file.name;
+            const pathParts = filePath.split(/[/\\]/);
+            
+            // Exclude files in temp/build folders
+            if (pathParts.some(part => excludedFolders.includes(part))) {
+                return false;
+            }
+            
             const ext = this.getFileExtension(file.name);
             return relevantExtensions.includes(ext);
         });
@@ -349,7 +377,7 @@ class AS4Converter {
             // All supported B&R Automation Studio file extensions
             const relevantExtensions = [
                 // Code files
-                '.st', '.fun', '.typ', '.var', '.prg',
+                '.st', '.fun', '.typ', '.var', '.prg', '.svar',
                 // Hardware and config
                 '.hw', '.hwl', '.sw', '.per',
                 // Project and package
@@ -357,15 +385,42 @@ class AS4Converter {
                 // Motion/Axis
                 '.ax', '.apt', '.ncm', '.ncc', '.dob',
                 // Localization
-                '.tmx',
+                '.tmx', '.textconfig', '.units',
                 // I/O and mapping
                 '.iom', '.vvm',
                 // Libraries
-                '.lby'
+                '.lby', '.br',
+                // mappView / Visualization
+                '.content', '.eventbinding', '.binding', '.action',
+                '.page', '.layout', '.dialog', '.theme', '.styles',
+                '.vis', '.mappviewcfg', '.widgetlibrary', '.snippet',
+                // OPC UA
+                '.uaserver',
+                // mapp components
+                '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
+                // Security and access
+                '.role', '.user', '.firewallRules',
+                // DTM / Device configuration
+                '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
+                // Media/assets
+                '.jpg', '.svg', '.png',
+                // Documentation
+                '.md', '.doc'
             ];
+            
+            // Folders to exclude (temp/build artifacts)
+            const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
             
             // Filter relevant files first
             const relevantFiles = files.filter(file => {
+                const filePath = file.relativePath || file.webkitRelativePath || file.name;
+                const pathParts = filePath.split(/[/\\]/);
+                
+                // Exclude files in temp/build folders
+                if (pathParts.some(part => excludedFolders.includes(part))) {
+                    return false;
+                }
+                
                 const ext = this.getFileExtension(file.name);
                 return relevantExtensions.includes(ext);
             });
@@ -440,6 +495,7 @@ class AS4Converter {
             '.typ': 'type_definition',
             '.var': 'variable',
             '.prg': 'program',
+            '.svar': 'variable',
             
             // Hardware configuration
             '.hw': 'hardware',
@@ -463,13 +519,61 @@ class AS4Converter {
             
             // Localization
             '.tmx': 'localization',
+            '.textconfig': 'localization',
+            '.units': 'localization',
             
             // I/O configuration
             '.iom': 'io_mapping',
             '.vvm': 'pv_mapping',
             
             // Library files
-            '.lby': 'library_binary'
+            '.lby': 'library_binary',
+            '.br': 'library_binary',
+            
+            // mappView / Visualization
+            '.content': 'visualization',
+            '.eventbinding': 'visualization',
+            '.binding': 'visualization',
+            '.action': 'visualization',
+            '.page': 'visualization',
+            '.layout': 'visualization',
+            '.dialog': 'visualization',
+            '.theme': 'visualization',
+            '.styles': 'visualization',
+            '.vis': 'visualization',
+            '.mappviewcfg': 'visualization',
+            '.widgetlibrary': 'visualization',
+            '.snippet': 'visualization',
+            
+            // OPC UA
+            '.uaserver': 'opcua',
+            
+            // mapp components
+            '.mpalarmxcore': 'mapp_component',
+            '.mpalarmxhistory': 'mapp_component',
+            '.mprecipexml': 'mapp_component',
+            '.mprecipecsv': 'mapp_component',
+            '.mpdatarecorder': 'mapp_component',
+            
+            // Security and access
+            '.role': 'security',
+            '.user': 'security',
+            '.firewallRules': 'security',
+            
+            // DTM / Device configuration
+            '.dtm': 'dtm',
+            '.dtmdre': 'dtm',
+            '.dtmtre': 'dtm',
+            '.dtmdri': 'dtm',
+            
+            // Media/assets
+            '.jpg': 'media',
+            '.svg': 'media',
+            '.png': 'media',
+            
+            // Documentation
+            '.md': 'documentation',
+            '.doc': 'documentation'
         };
         return typeMap[ext] || 'unknown';
     }
@@ -481,7 +585,8 @@ class AS4Converter {
             pkg: 0,
             tmx: 0,
             motion: 0,
-            hw: 0
+            hw: 0,
+            vis: 0
         };
         
         this.projectFiles.forEach((file) => {
@@ -496,6 +601,8 @@ class AS4Converter {
                 stats.motion++;
             } else if (file.type === 'hardware' || file.type === 'hardware_list' || file.type === 'software_config') {
                 stats.hw++;
+            } else if (file.type === 'visualization') {
+                stats.vis++;
             }
         });
         
@@ -504,6 +611,7 @@ class AS4Converter {
         if (this.elements.pkgFiles) this.elements.pkgFiles.textContent = stats.pkg;
         if (this.elements.tmxFiles) this.elements.tmxFiles.textContent = stats.tmx;
         if (this.elements.motionFiles) this.elements.motionFiles.textContent = stats.motion;
+        if (this.elements.visFiles) this.elements.visFiles.textContent = stats.vis;
         this.elements.hwFiles.textContent = stats.hw;
         
         // Show/hide elements
@@ -558,7 +666,14 @@ class AS4Converter {
             'localization': '🌐',
             'io_mapping': '🔗',
             'pv_mapping': '📍',
-            'library_binary': '📚'
+            'library_binary': '📚',
+            'visualization': '🖥️',
+            'opcua': '🔗',
+            'mapp_component': '🧩',
+            'security': '🔒',
+            'dtm': '🔧',
+            'media': '🖼️',
+            'documentation': '📖'
         };
         return icons[type] || '📄';
     }
@@ -840,30 +955,6 @@ class AS4Converter {
                     original: ''
                 });
             }
-            
-            // GCC Compiler version change (AS4 uses 4.1.2, AS6 uses 11.3.0)
-            this.addFinding({
-                type: 'compiler',
-                name: 'GCC Compiler Version',
-                severity: 'warning',
-                description: `GCC compiler must be updated: ${DeprecationDatabase.as6Format.compiler.as4.gcc} → ${DeprecationDatabase.as6Format.compiler.as6.gcc}`,
-                file: path,
-                replacement: { name: `GCC ${DeprecationDatabase.as6Format.compiler.as6.gcc}`, description: 'Update to AS6 default GCC compiler' },
-                notes: 'AS6 requires GCC 11.3.0. This is a significant compiler change that may affect code compilation.',
-                original: `GCC ${DeprecationDatabase.as6Format.compiler.as4.gcc}`
-            });
-            
-            // Automation Runtime version change
-            this.addFinding({
-                type: 'runtime',
-                name: 'Automation Runtime',
-                severity: 'warning',
-                description: `Automation Runtime must be updated: ${DeprecationDatabase.as6Format.automationRuntime.as4.version} → ${DeprecationDatabase.as6Format.automationRuntime.as6.version}`,
-                file: path,
-                replacement: { name: `AR ${DeprecationDatabase.as6Format.automationRuntime.as6.version}`, description: 'Update to AS6 default Automation Runtime' },
-                notes: 'AS6 uses Automation Runtime 6.2.1. This affects the target runtime on the PLC.',
-                original: `AR ${DeprecationDatabase.as6Format.automationRuntime.as4.version}`
-            });
         } else if (versionInfo && versionInfo.major === 6) {
             // Already AS6 - mark as compatible
             this.addFinding({
@@ -887,6 +978,56 @@ class AS4Converter {
     // ==========================================
     
     analyzePackageFile(path, content) {
+        // Check for GCC compiler version in Cpu.pkg files
+        const gccMatch = content.match(/GccVersion="([^"]+)"/);
+        if (gccMatch) {
+            const gccVersion = gccMatch[1];
+            const as6GccVersion = DeprecationDatabase.as6Format.compiler.as6.gcc;
+            if (gccVersion !== as6GccVersion) {
+                this.addFinding({
+                    type: 'compiler',
+                    name: 'GCC Compiler Version',
+                    severity: 'warning',
+                    description: `GCC compiler version: ${gccVersion} → ${as6GccVersion}`,
+                    file: path,
+                    line: this.getLineNumber(content, gccMatch.index),
+                    replacement: { name: `GCC ${as6GccVersion}`, description: 'Update to AS6 GCC compiler' },
+                    notes: `GCC version must be updated from ${gccVersion} to ${as6GccVersion} for AS6 compatibility.`,
+                    original: gccMatch[0],
+                    conversion: {
+                        type: 'gcc_version',
+                        from: gccVersion,
+                        to: as6GccVersion,
+                        automated: true
+                    }
+                });
+            }
+        }
+        
+        // Check for Automation Runtime version
+        const arMatch = content.match(/AutomationRuntime\s+Version="([^"]+)"/);
+        if (arMatch) {
+            const arVersion = arMatch[1];
+            const as6ArVersion = DeprecationDatabase.as6Format.automationRuntime.as6.version;
+            this.addFinding({
+                type: 'runtime',
+                name: 'Automation Runtime',
+                severity: 'warning',
+                description: `Automation Runtime: ${arVersion} → ${as6ArVersion}`,
+                file: path,
+                line: this.getLineNumber(content, arMatch.index),
+                replacement: { name: `AR ${as6ArVersion}`, description: 'Update to AS6 Automation Runtime' },
+                notes: `Automation Runtime must be updated from ${arVersion} to ${as6ArVersion} for AS6.`,
+                original: arMatch[0],
+                conversion: {
+                    type: 'ar_version',
+                    from: arVersion,
+                    to: as6ArVersion,
+                    automated: true
+                }
+            });
+        }
+        
         // Check package file version
         const versionMatch = content.match(/<\?AutomationStudio\s+FileVersion="([^"]+)"/);
         if (versionMatch) {
@@ -1687,6 +1828,16 @@ class AS4Converter {
                 after = after.substring(0, 500) + '\n... (truncated for display)';
                 notes = 'Complete project file will be converted to AS6 format with updated XML structure, namespace, and technology packages.';
             }
+        } else if (finding.type === 'compiler' && finding.conversion) {
+            // GCC compiler version update
+            before = finding.original;
+            after = `GccVersion="${finding.conversion.to}"`;
+            notes = `GCC compiler updated from ${finding.conversion.from} to ${finding.conversion.to}`;
+        } else if (finding.type === 'runtime' && finding.conversion) {
+            // Automation Runtime version update
+            before = finding.original;
+            after = `AutomationRuntime Version="${finding.conversion.to}"`;
+            notes = `Automation Runtime updated from ${finding.conversion.from} to ${finding.conversion.to}`;
         } else if (finding.type === 'technology_package' && finding.replacement) {
             // Technology package version update
             const oldPkg = finding.original;
@@ -1737,6 +1888,19 @@ class AS4Converter {
         if (finding.type === 'project' && finding.name === 'AS4 Project File') {
             // Full project file conversion using the database method
             convertedContent = DeprecationDatabase.convertProjectFileToAS6(originalContent);
+        } else if (finding.type === 'compiler' && finding.conversion) {
+            // GCC compiler version replacement
+            convertedContent = originalContent.replace(
+                `GccVersion="${finding.conversion.from}"`,
+                `GccVersion="${finding.conversion.to}"`
+            );
+        } else if (finding.type === 'runtime' && finding.conversion) {
+            // Automation Runtime version replacement - escape special regex chars in version
+            const escapedFrom = finding.conversion.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            convertedContent = originalContent.replace(
+                new RegExp(`(AutomationRuntime\\s+Version=")${escapedFrom}(")`,'g'),
+                `$1${finding.conversion.to}$2`
+            );
         } else {
             // Standard text replacement conversion
             const conversion = this.generateConversion(finding);
