@@ -142,23 +142,23 @@ const DeprecationDatabase = {
         // Library to Technology Package mapping for AS6 upgrades
         // Maps AS4 5.x libraries to their AS6 6.x equivalents
         libraryMapping: {
-            // mappServices (6.0.0) - Data management and services
-            'MpAlarmX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            // mappServices (6.0.0 & 6.2.0) - Data management and services
+            'MpAlarmX': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'MpAudit': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpBackup': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpCodeBox': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpCom': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MpData': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpData': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'MpDatabase': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpFile': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpIO': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MpRecipe': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpRecipe': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'MpReport': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpSequence': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpUserX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpServer': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // mappView (6.0.0) - Visualization
-            'MpServer': { techPackage: 'mappView', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             
             // mappMotion (6.0.0) - Motion control
             'MpAxis': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
@@ -181,8 +181,8 @@ const DeprecationDatabase = {
             'Acp10sim': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'NcGlobal': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
-            // MpBase - Core mapp component (included with most tech packages)
-            'MpBase': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            // MpBase - Core mapp component (upgraded to 6.5.0 in AS6)
+            'MpBase': { techPackage: 'mappServices', as6Version: '6.5.0', as6LibVersion: '6.5.0' },
             
             // mappSafety (6.2.0) - Safety libraries
             'SfDomain': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
@@ -190,9 +190,9 @@ const DeprecationDatabase = {
             'SafeMOTION': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'MpSafety': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
-            // MTTypes/MTData - Motion toolbox (Library_2)
-            'MTTypes': { source: 'Library_2', as6LibVersion: null },
-            'MTData': { source: 'Library_2', as6LibVersion: null },
+            // MTTypes/MTData - Motion toolbox (specific versions in AS6)
+            'MTTypes': { source: 'Library_2', as6LibVersion: '6.0.0' },
+            'MTData': { source: 'Library_2', as6LibVersion: '6.4.0' },
             'MTAdvanced': { source: 'Library_2', as6LibVersion: null },
             'MTSystem': { source: 'Library_2', as6LibVersion: null },
             'MTTemp': { source: 'Library_2', as6LibVersion: null },

@@ -2821,6 +2821,17 @@ class AS4Converter {
             return;
         }
         
+        // Show progress dialog
+        const progressDialog = document.getElementById('downloadProgressDialog');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercent = document.getElementById('progressPercent');
+        const progressMessage = document.getElementById('progressMessage');
+        
+        progressDialog.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressPercent.textContent = '0%';
+        progressMessage.textContent = 'Creating ZIP archive...';
+        
         const zip = new JSZip();
         const projectName = this.getProjectName();
         
@@ -2829,11 +2840,22 @@ class AS4Converter {
         
         // Add all project files with their directory structure
         // Library versions have been updated in-place during analysis
+        let fileCount = 0;
+        const totalFiles = this.projectFiles.size;
         this.projectFiles.forEach((file, path) => {
             projectFolder.file(path, file.content);
+            fileCount++;
+            // Update progress to 50% during file addition
+            const percent = Math.floor((fileCount / totalFiles) * 50);
+            progressBar.style.width = percent + '%';
+            progressPercent.textContent = percent + '%';
         });
         
         // Add AS6 structural changes info
+        progressMessage.textContent = 'Adding migration information...';
+        progressBar.style.width = '55%';
+        progressPercent.textContent = '55%';
+        
         const structuralChanges = DeprecationDatabase.getAS6StructuralChanges();
         projectFolder.file('_AS6_migration_info.json', JSON.stringify({
             conversionDate: new Date().toISOString(),
@@ -2859,21 +2881,42 @@ class AS4Converter {
         
         // Generate ZIP file
         try {
+            progressMessage.textContent = 'Compressing files...';
+            progressBar.style.width = '60%';
+            progressPercent.textContent = '60%';
+            
             const blob = await zip.generateAsync({ 
                 type: 'blob',
                 compression: 'DEFLATE',
                 compressionOptions: { level: 6 }
             }, (metadata) => {
-                // Update progress if needed
-                console.log(`Zipping: ${metadata.percent.toFixed(0)}%`);
+                // Update progress during compression
+                const percent = 60 + Math.floor(metadata.percent * 0.4); // 60-100%
+                progressBar.style.width = percent + '%';
+                progressPercent.textContent = percent + '%';
             });
             
             // Download the ZIP
+            progressMessage.textContent = 'Finalizing download...';
+            progressBar.style.width = '95%';
+            progressPercent.textContent = '95%';
+            
             const filename = `${projectName}_AS6_converted.zip`;
             this.downloadBlob(blob, filename);
             
+            // Complete
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressMessage.textContent = 'Download complete!';
+            
+            // Hide dialog after 1 second
+            setTimeout(() => {
+                progressDialog.classList.add('hidden');
+            }, 1000);
+            
         } catch (error) {
             console.error('Error creating ZIP:', error);
+            progressDialog.classList.add('hidden');
             alert('Error creating ZIP file: ' + error.message);
         }
     }
