@@ -66,11 +66,28 @@ const DeprecationDatabase = {
         iecSettingsFormat: 'attributes', // AS4 uses 'nested', AS6 uses 'attributes'
         
         // Technology packages (verified versions from real AS6 project)
+        // Note: subVersions are only used for packages that actually require them (like OpcUaFx)
+        // Acp10man, NcGlobal, etc. are LIBRARIES within the tech package, not subVersions
         technologyPackages: {
-            'Acp10Arnc0': { as4Version: '5.24.1', as6Version: '6.2.0', required: true },
+            'Acp10Arnc0': { 
+                as4Version: '5.24.1', 
+                as6Version: '6.2.0', 
+                required: true
+                // Note: Acp10man, NcGlobal, etc. are libraries, not subVersions
+            },
             'mapp': { as4Version: '5.24.2', as6Version: null, replacedBy: 'mappServices' },
-            'mappServices': { as4Version: null, as6Version: '6.2.0', newInAS6: true },
-            'mappSafety': { as4Version: '5.24.1', as6Version: '6.2.0', required: false },
+            'mappServices': { 
+                as4Version: null, 
+                as6Version: '6.2.0', 
+                newInAS6: true
+                // Note: MpAlarmX, MpBase, etc. are libraries, not subVersions
+            },
+            'mappSafety': { 
+                as4Version: '5.24.1', 
+                as6Version: '6.2.0', 
+                required: false
+                // Note: SfDomain is a library, not a subVersion
+            },
             'mappView': { as4Version: '5.24.1', as6Version: '6.2.0', required: false },
             'OpcUaCs': { as4Version: null, as6Version: '6.0.0', newInAS6: true },
             'OpcUaFx': { as4Version: null, as6Version: '6.1.0', newInAS6: true, subVersions: { FxPtpB: '6.1.0', FxPubSubB: '6.1.0', PubSub: '1.3.0' } }
@@ -157,15 +174,21 @@ const DeprecationDatabase = {
             // mappCockpit (6.0.0) - Diagnostics
             'CoTrace': { techPackage: 'mappCockpit', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             
-            // Acp10Arnc0 (6.0.0) - ACOPOS motion (note: library versions use 6.00.0 format)
-            'Acp10_MC': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
-            'Acp10man': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
-            'Acp10par': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
-            'Acp10sim': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
-            'NcGlobal': { techPackage: 'Acp10Arnc0', as6Version: '6.0.0', as6LibVersion: '6.00.0' },
+            // Acp10Arnc0 (6.2.0) - ACOPOS motion
+            'Acp10_MC': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'Acp10man': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'Acp10par': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'Acp10sim': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'NcGlobal': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // MpBase - Core mapp component (included with most tech packages)
-            'MpBase': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MpBase': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            
+            // mappSafety (6.2.0) - Safety libraries
+            'SfDomain': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'SafeLOGIC': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'SafeMOTION': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'MpSafety': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // MTTypes/MTData - Motion toolbox (Library_2)
             'MTTypes': { source: 'Library_2', as6LibVersion: null },

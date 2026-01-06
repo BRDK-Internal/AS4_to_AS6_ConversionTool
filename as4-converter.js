@@ -299,22 +299,36 @@ class AS4Converter {
             '.iom', '.vvm',
             // Libraries
             '.lby', '.br',
+            // ANSI C source files (critical for custom libraries)
+            '.c', '.h',
             // mappView / Visualization
             '.content', '.eventbinding', '.binding', '.action',
             '.page', '.layout', '.dialog', '.theme', '.styles',
             '.vis', '.mappviewcfg', '.widgetlibrary', '.snippet',
+            // mappView custom widgets and keyboards
+            '.numpad', '.compoundwidget', '.stylesset',
             // OPC UA
-            '.uaserver',
+            '.uaserver', '.uad',
             // mapp components
             '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
             // Security and access
-            '.role', '.user', '.firewallRules',
+            '.role', '.user', '.firewallrules',
             // DTM / Device configuration
             '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
+            // Motion/Data objects
+            '.ett',
+            // Language/Localization
+            '.language',
+            // Safety
+            '.sfapp', '.swt',
             // Media/assets
-            '.jpg', '.svg', '.png',
-            // Documentation
-            '.md', '.doc'
+            '.jpg', '.svg', '.png', '.gif', '.bmp', '.ico',
+            // Build scripts
+            '.ps1', '.bat', '.cmd',
+            // Git/config
+            '.gitignore',
+            // Licenses and docs
+            '.md', '.doc', '.txt'
         ];
         // Folders to exclude (temp/build artifacts)
         const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
@@ -391,22 +405,36 @@ class AS4Converter {
                 '.iom', '.vvm',
                 // Libraries
                 '.lby', '.br',
+                // ANSI C source files (critical for custom libraries)
+                '.c', '.h',
                 // mappView / Visualization
                 '.content', '.eventbinding', '.binding', '.action',
                 '.page', '.layout', '.dialog', '.theme', '.styles',
                 '.vis', '.mappviewcfg', '.widgetlibrary', '.snippet',
+                // mappView custom widgets and keyboards
+                '.numpad', '.compoundwidget', '.stylesset',
                 // OPC UA
-                '.uaserver',
+                '.uaserver', '.uad',
                 // mapp components
                 '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
                 // Security and access
-                '.role', '.user', '.firewallRules',
+                '.role', '.user', '.firewallrules',
                 // DTM / Device configuration
                 '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
+                // Motion/Data objects
+                '.ett',
+                // Language/Localization
+                '.language',
+                // Safety
+                '.sfapp', '.swt',
                 // Media/assets
-                '.jpg', '.svg', '.png',
-                // Documentation
-                '.md', '.doc'
+                '.jpg', '.svg', '.png', '.gif', '.bmp', '.ico',
+                // Build scripts
+                '.ps1', '.bat', '.cmd',
+                // Git/config
+                '.gitignore',
+                // Licenses and docs
+                '.md', '.doc', '.txt'
             ];
             
             // Folders to exclude (temp/build artifacts)
@@ -545,6 +573,9 @@ class AS4Converter {
             '.mappviewcfg': 'visualization',
             '.widgetlibrary': 'visualization',
             '.snippet': 'visualization',
+            '.numpad': 'visualization',
+            '.compoundwidget': 'visualization',
+            '.stylesset': 'visualization',
             
             // OPC UA
             '.uaserver': 'opcua',
@@ -559,7 +590,7 @@ class AS4Converter {
             // Security and access
             '.role': 'security',
             '.user': 'security',
-            '.firewallRules': 'security',
+            '.firewallrules': 'security',
             
             // DTM / Device configuration
             '.dtm': 'dtm',
@@ -567,14 +598,41 @@ class AS4Converter {
             '.dtmtre': 'dtm',
             '.dtmdri': 'dtm',
             
+            // ANSI C source files
+            '.c': 'c_source',
+            '.h': 'c_header',
+            
+            // OPC UA data
+            '.uad': 'opcua_data',
+            
+            // Motion data objects
+            '.ett': 'data_object',
+            
+            // Language/Localization
+            '.language': 'localization',
+            
+            // Safety
+            '.sfapp': 'safety',
+            '.swt': 'safety',
+            
             // Media/assets
             '.jpg': 'media',
             '.svg': 'media',
             '.png': 'media',
+            '.gif': 'media',
+            '.bmp': 'media',
+            '.ico': 'media',
+            
+            // Scripts and config
+            '.ps1': 'script',
+            '.bat': 'script',
+            '.cmd': 'script',
+            '.gitignore': 'config',
             
             // Documentation
             '.md': 'documentation',
-            '.doc': 'documentation'
+            '.doc': 'documentation',
+            '.txt': 'documentation'
         };
         return typeMap[ext] || 'unknown';
     }
@@ -719,6 +777,9 @@ class AS4Converter {
                 const severityOrder = { error: 0, warning: 1, info: 2 };
                 return (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3);
             });
+            
+            // Auto-apply library version updates for technology package libraries
+            this.autoApplyLibraryVersionUpdates();
             
             // Update UI
             this.displayAnalysisResults();
@@ -1549,48 +1610,43 @@ class AS4Converter {
         const mapping = DeprecationDatabase.as6Format.libraryMapping[libraryName];
         
         if (is5xVersion && mapping && mapping.techPackage) {
-            // Technology package library - should be removed from local Libraries folder
-            // AS6 will use the library from the installed technology package
+            // Technology package library - needs version update to AS6 version
+            // The library stays in the project but with updated version numbers
             this.addFinding({
                 type: 'library_version',
                 name: libraryName,
                 severity: 'warning',
-                description: `Library should be removed - provided by ${mapping.techPackage} technology package`,
+                description: `Library version needs update from ${version} to ${mapping.as6Version}`,
                 replacement: {
-                    name: `${mapping.techPackage} ${mapping.as6Version}`,
-                    description: `Library is included in ${mapping.techPackage} technology package`
+                    name: `${libraryName} ${mapping.as6Version}`,
+                    description: `Update to AS6 version from ${mapping.techPackage} technology package`
                 },
                 notes: `This library is part of the ${mapping.techPackage} technology package. ` +
-                       `In AS6, remove the local copy from Logical/Libraries and ensure the ` +
-                       `${mapping.techPackage} ${mapping.as6Version} technology package is installed. ` +
-                       `The library will be automatically available from the installed package.`,
+                       `Version will be updated from ${version} to ${mapping.as6Version}.`,
                 file: path,
                 original: version,
                 conversion: {
                     libraryName: libraryName,
                     from: version,
-                    to: null, // Don't update version - library should be removed
+                    to: mapping.as6Version,
                     techPackage: mapping.techPackage,
-                    source: mapping.source,
-                    action: 'remove', // Mark for removal instead of version update
-                    automated: false // Manual action required
+                    action: 'update_version', // Update version instead of remove
+                    automated: true
                 }
             });
         } else if (is5xVersion && mapping && mapping.source === 'Library_2') {
             // Core runtime library - bundled with Automation Runtime
-            // Can be removed from local Libraries folder
+            // These don't need version updates as they're provided by AR
             this.addFinding({
                 type: 'library_version',
                 name: libraryName,
                 severity: 'info',
-                description: `Library bundled with Automation Runtime - local copy can be removed`,
+                description: `Library bundled with Automation Runtime`,
                 replacement: {
                     name: 'AR bundled',
                     description: 'Library is bundled with Automation Runtime'
                 },
-                notes: `This library is bundled with the Automation Runtime. ` +
-                       `The local copy in Logical/Libraries can be removed. ` +
-                       `AS6 will use the library from the installed runtime.`,
+                notes: `This library is bundled with the Automation Runtime. No version update needed.`,
                 file: path,
                 original: version,
                 conversion: {
@@ -1623,6 +1679,53 @@ class AS4Converter {
             mapping,
             needsUpgrade: is5xVersion && mapping
         });
+    }
+
+    /**
+     * Auto-apply library removals for technology package and Library_2 libraries
+     * These libraries should be excluded from the converted project automatically
+     */
+    autoApplyLibraryVersionUpdates() {
+        // Find all library_version findings that need version updates
+        this.analysisResults.forEach(finding => {
+            if (finding.type === 'library_version' && finding.conversion && finding.conversion.action === 'update_version') {
+                const file = this.projectFiles.get(finding.file);
+                if (!file) return;
+                
+                const oldVersion = finding.conversion.from;
+                const newVersion = finding.conversion.to;
+                
+                console.log(`Updating library version: ${finding.conversion.libraryName} from ${oldVersion} to ${newVersion}`);
+                
+                let content = file.content;
+                
+                // Update the Library Version attribute
+                content = content.replace(
+                    /<Library\s+Version="[^"]+"/,
+                    `<Library Version="${newVersion}"`
+                );
+                
+                // Update all Dependency FromVersion attributes for this library's dependencies
+                content = content.replace(
+                    /(<Dependency[^>]*FromVersion=")[^"]+(")/g,
+                    `$1${newVersion}$2`
+                );
+                
+                // Update all Dependency ToVersion attributes
+                content = content.replace(
+                    /(<Dependency[^>]*ToVersion=")[^"]+(")/g,
+                    `$1${newVersion}$2`
+                );
+                
+                file.content = content;
+                
+                // Mark as auto-applied
+                finding.status = 'applied';
+                finding.notes = (finding.notes || '') + ` [Auto-applied: Version updated to ${newVersion}]`;
+            }
+        });
+        
+        console.log('Library version updates completed');
     }
 
     addFinding(finding) {
@@ -2283,29 +2386,30 @@ class AS4Converter {
             // Library version handling
             const conv = finding.conversion;
             
-            if (conv.action === 'remove') {
-                // Mark library for removal from converted project
-                // Instead of modifying the file, we'll exclude it during download
-                this.librariesToRemove = this.librariesToRemove || new Set();
+            if (conv.action === 'update_version' && conv.to) {
+                // Update library version in .lby file
+                let content = originalContent;
                 
-                // Get the library folder path (remove the filename from path)
-                const pathParts = finding.file.split(/[/\\]/);
-                pathParts.pop(); // Remove Binary.lby or similar
-                const libraryFolderPath = pathParts.join('/');
-                
-                this.librariesToRemove.add(libraryFolderPath);
-                this.librariesToRemove.add(conv.libraryName); // Also store library name for reference
-                
-                // Don't modify the content - just mark as applied
-                convertedContent = originalContent;
-                finding.notes = (finding.notes || '') + ' [Library will be excluded from converted project]';
-            } else if (conv.source === 'Library_2' && conv.to) {
-                // Library is bundled with AR - update version if specified
-                const escapedFrom = conv.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                convertedContent = originalContent.replace(
-                    new RegExp(`(<Library\\s+)Version="${escapedFrom}"`, 'g'),
-                    '$1'
+                // Update the Library Version attribute
+                content = content.replace(
+                    /<Library\s+Version="[^"]+"/,
+                    `<Library Version="${conv.to}"`
                 );
+                
+                // Update all Dependency FromVersion attributes
+                content = content.replace(
+                    /(<Dependency[^>]*FromVersion=")[^"]+(")/g,
+                    `$1${conv.to}$2`
+                );
+                
+                // Update all Dependency ToVersion attributes
+                content = content.replace(
+                    /(<Dependency[^>]*ToVersion=")[^"]+(")/g,
+                    `$1${conv.to}$2`
+                );
+                
+                convertedContent = content;
+                finding.notes = (finding.notes || '') + ` [Version updated to ${conv.to}]`;
             } else if (conv.to) {
                 // Update version number (for custom libraries)
                 const escapedFrom = conv.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2724,28 +2828,9 @@ class AS4Converter {
         const projectFolder = zip.folder(projectName + '_AS6');
         
         // Add all project files with their directory structure
-        // Exclude libraries that are marked for removal (technology package libraries)
-        const removedLibraries = [];
+        // Library versions have been updated in-place during analysis
         this.projectFiles.forEach((file, path) => {
-            // Check if this file is in a library folder marked for removal
-            let shouldExclude = false;
-            if (this.librariesToRemove && this.librariesToRemove.size > 0) {
-                for (const libPath of this.librariesToRemove) {
-                    // Check if path starts with the library folder path
-                    if (path.startsWith(libPath + '/') || path.startsWith(libPath + '\\') || path === libPath) {
-                        shouldExclude = true;
-                        if (!removedLibraries.includes(libPath)) {
-                            removedLibraries.push(libPath);
-                        }
-                        break;
-                    }
-                }
-            }
-            
-            if (!shouldExclude) {
-                // Preserve the directory structure
-                projectFolder.file(path, file.content);
-            }
+            projectFolder.file(path, file.content);
         });
         
         // Add AS6 structural changes info
@@ -2755,18 +2840,13 @@ class AS4Converter {
             sourceVersion: 'AS4.x',
             targetVersion: 'AS6.x',
             structuralChanges: structuralChanges,
-            removedLibraries: removedLibraries.length > 0 ? {
-                count: removedLibraries.length,
-                paths: removedLibraries,
-                reason: 'These libraries are provided by AS6 technology packages and should not be included in the project. Install the required technology packages in Automation Studio 6.'
-            } : null,
+            libraryUpdates: 'Technology package library versions have been updated to AS6 versions.',
             notes: [
                 'This project has been converted from AS4 to AS6 format.',
                 'Review all changes before importing into Automation Studio 6.',
-                'Some manual adjustments may be required for hardware and library configurations.',
-                'New AS6 directories (AccessAndSecurity, Connectivity) may need to be created manually.',
-                removedLibraries.length > 0 ? `${removedLibraries.length} technology package libraries were removed. Install the required technology packages in AS6.` : null
-            ].filter(Boolean)
+                'Library .lby files have been updated with AS6-compatible version numbers.',
+                'Ensure the required technology packages are installed in Automation Studio 6.'
+            ]
         }, null, 2));
         
         // Add conversion report as JSON
