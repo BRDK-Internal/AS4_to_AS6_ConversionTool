@@ -1603,13 +1603,14 @@ class AS4Converter {
         // Skip if no version (e.g., custom user libraries without version)
         if (!version) return;
         
-        // Check if this is an AS4 5.x library that needs upgrading
-        const is5xVersion = version && version.match(/^5\.\d+/);
+        // Check if this is an AS4 library that needs upgrading (any version < 6.0.0)
+        // AS4 libraries can be 5.x, 1.x, 2.x, etc. - all need updating to AS6 versions
+        const isAS4Version = version && !version.match(/^6\.\d+/);
         
         // Look up library in mapping database
         const mapping = DeprecationDatabase.as6Format.libraryMapping[libraryName];
         
-        if (is5xVersion && mapping && mapping.techPackage) {
+        if (isAS4Version && mapping && mapping.techPackage) {
             // Technology package library - needs version update to AS6 version
             // The library stays in the project but with updated version numbers
             this.addFinding({
@@ -1634,32 +1635,57 @@ class AS4Converter {
                     automated: true
                 }
             });
-        } else if (is5xVersion && mapping && mapping.source === 'Library_2') {
-            // Core runtime library - bundled with Automation Runtime
-            // These don't need version updates as they're provided by AR
-            this.addFinding({
-                type: 'library_version',
-                name: libraryName,
-                severity: 'info',
-                description: `Library bundled with Automation Runtime`,
-                replacement: {
-                    name: 'AR bundled',
-                    description: 'Library is bundled with Automation Runtime'
-                },
-                notes: `This library is bundled with the Automation Runtime. No version update needed.`,
-                file: path,
-                original: version,
-                conversion: {
-                    libraryName: libraryName,
-                    from: version,
-                    to: null,
-                    source: mapping.source,
-                    action: 'remove',
-                    automated: false
-                }
-            });
-        } else if (is5xVersion && !mapping) {
-            // Unknown 5.x library - might be user/custom library
+        } else if (isAS4Version && mapping && mapping.source === 'Library_2') {
+            // Library_2 source - check if it needs version update or is bundled
+            if (mapping.as6LibVersion) {
+                // Library_2 with specific AS6 version - needs version update (e.g., MTTypes, MTData)
+                this.addFinding({
+                    type: 'library_version',
+                    name: libraryName,
+                    severity: 'warning',
+                    description: `Library version needs update from ${version} to ${mapping.as6LibVersion}`,
+                    replacement: {
+                        name: `${libraryName} ${mapping.as6LibVersion}`,
+                        description: `Update to AS6 version`
+                    },
+                    notes: `This library requires an updated version for AS6 compatibility.`,
+                    file: path,
+                    original: version,
+                    conversion: {
+                        libraryName: libraryName,
+                        from: version,
+                        to: mapping.as6LibVersion,
+                        source: mapping.source,
+                        action: 'update_version',
+                        automated: true
+                    }
+                });
+            } else {
+                // Core runtime library - bundled with Automation Runtime, no version update needed
+                this.addFinding({
+                    type: 'library_version',
+                    name: libraryName,
+                    severity: 'info',
+                    description: `Library bundled with Automation Runtime`,
+                    replacement: {
+                        name: 'AR bundled',
+                        description: 'Library is bundled with Automation Runtime'
+                    },
+                    notes: `This library is bundled with the Automation Runtime. No version update needed.`,
+                    file: path,
+                    original: version,
+                    conversion: {
+                        libraryName: libraryName,
+                        from: version,
+                        to: null,
+                        source: mapping.source,
+                        action: 'none',
+                        automated: false
+                    }
+                });
+            }
+        } else if (isAS4Version && !mapping) {
+            // Unknown AS4 library - might be user/custom library
             this.addFinding({
                 type: 'library_version',
                 name: libraryName,
@@ -1677,7 +1703,7 @@ class AS4Converter {
             path,
             version,
             mapping,
-            needsUpgrade: is5xVersion && mapping
+            needsUpgrade: isAS4Version && mapping
         });
     }
 
@@ -2838,18 +2864,52 @@ class AS4Converter {
         // Create project folder in ZIP
         const projectFolder = zip.folder(projectName + '_AS6');
         
+        // Get list of technology package libraries that should have binaries excluded
+        // These include libraries with techPackage property AND Library_2 sources with specific AS6 versions
+        const techPackageLibraries = new Set();
+        Object.entries(DeprecationDatabase.as6Format.libraryMapping).forEach(([libName, mapping]) => {
+            if (mapping.techPackage || mapping.as6LibVersion) {
+                techPackageLibraries.add(libName.toLowerCase());
+            }
+        });
+        
+        // Binary file extensions to exclude from technology package libraries
+        const binaryExtensions = ['.br', '.a', '.o'];
+        
         // Add all project files with their directory structure
         // Library versions have been updated in-place during analysis
+        // Exclude binary files from technology package libraries (they'll be provided by AS6)
         let fileCount = 0;
+        let skippedBinaries = 0;
         const totalFiles = this.projectFiles.size;
         this.projectFiles.forEach((file, path) => {
-            projectFolder.file(path, file.content);
+            // Check if this is a binary file in a technology package library
+            const pathParts = path.toLowerCase().split(/[/\\]/);
+            const libIndex = pathParts.indexOf('libraries');
+            let isTechPackageBinary = false;
+            
+            if (libIndex >= 0 && libIndex < pathParts.length - 1) {
+                const libName = pathParts[libIndex + 1];
+                const ext = this.getFileExtension(file.name);
+                if (techPackageLibraries.has(libName) && binaryExtensions.includes(ext.toLowerCase())) {
+                    isTechPackageBinary = true;
+                    skippedBinaries++;
+                }
+            }
+            
+            if (!isTechPackageBinary) {
+                projectFolder.file(path, file.content);
+            }
             fileCount++;
             // Update progress to 50% during file addition
             const percent = Math.floor((fileCount / totalFiles) * 50);
             progressBar.style.width = percent + '%';
             progressPercent.textContent = percent + '%';
         });
+        
+        if (skippedBinaries > 0) {
+            console.log(`Skipped ${skippedBinaries} binary files from technology package libraries`);
+        }
         
         // Add AS6 structural changes info
         progressMessage.textContent = 'Adding migration information...';
@@ -2863,11 +2923,14 @@ class AS4Converter {
             targetVersion: 'AS6.x',
             structuralChanges: structuralChanges,
             libraryUpdates: 'Technology package library versions have been updated to AS6 versions.',
+            binaryFilesExcluded: skippedBinaries,
             notes: [
                 'This project has been converted from AS4 to AS6 format.',
                 'Review all changes before importing into Automation Studio 6.',
                 'Library .lby files have been updated with AS6-compatible version numbers.',
-                'Ensure the required technology packages are installed in Automation Studio 6.'
+                'Binary files (.br, .a) from technology package libraries have been EXCLUDED.',
+                'Automation Studio 6 will automatically link the correct binaries from installed technology packages.',
+                'Ensure the required technology packages are installed in Automation Studio 6 BEFORE opening this project.'
             ]
         }, null, 2));
         

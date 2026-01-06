@@ -985,16 +985,10 @@ const DeprecationDatabase = {
             description: "Data object creation - interface changed",
             replacement: { name: "DatObjCreate", library: "DataObj", notes: "Parameter order changed in AS6" },
             pattern: /DatObjCreate\s*\(/gi
-        },
-        {
-            id: "func_fub_enable",
-            name: "FUB_ENABLE",
-            library: "runtime",
-            severity: "info",
-            description: "Function block enable pattern - deprecated style",
-            replacement: { name: "Enable pattern", notes: "Use Enable input with status outputs" },
-            pattern: /FUB_ENABLE/gi
         }
+        // NOTE: FUB_ENABLE pattern removed - it was causing false positive replacements
+        // in constant names like ERR_FUB_ENABLE_FALSE, corrupting valid code.
+        // FUB_ENABLE is a valid constant in runtime library, not a deprecated function.
     ],
 
     // ==========================================
