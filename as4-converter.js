@@ -842,7 +842,7 @@ class AS4Converter {
             // Auto-apply function replacements (memset→brsmemset, etc.)
             this.autoApplyFunctionReplacements();
             
-            // Auto-apply OPC UA mapping file conversion (FileVersion 7 → 9)
+            // Auto-apply OPC UA conversion (OpcUA → OpcUaCs, FileVersion 10, config files)
             this.autoApplyUadFileConversion();
             
             // Update UI
@@ -1892,67 +1892,300 @@ class AS4Converter {
     }
 
     /**
-     * Convert OPC UA mapping files (.uad) from FileVersion 7 to FileVersion 9
+     * Convert OPC UA configuration from AS4 (OpcUA) to AS6 (OpcUaCs) format
      * Changes:
-     * - FileVersion="7" -> FileVersion="9"
-     * - Remove RoleId attribute from ACE elements (keep RoleName)
-     * - AutomaticEnable="True" -> RecursiveEnable="1"
-     * - EnableArrayElements="True" -> RecursiveEnable="1"
+     * - Rename OpcUA folder to OpcUaCs
+     * - Update Package.pkg: SubType and PackageType from OpcUA to OpcUaCs
+     * - Add UaCsConfig.uacfg and UaDvConfig.uadcfg config files
+     * - Update .uad file: XML PI FileVersion 4.9 → 6.0, OpcUaSource FileVersion 9 → 10
+     * - Update ACL Access values: 0x005F → 0x10A1, 0x007F → 0x10E1
+     * - Remove RoleId attributes from ACE elements
+     * - Replace AutomaticEnable/EnableArrayElements with RecursiveEnable
      */
     autoApplyUadFileConversion() {
-        console.log('Converting OPC UA mapping files (.uad) to AS6 format...');
+        console.log('Converting OPC UA configuration to AS6 OpcUaCs format...');
         
-        let filesConverted = 0;
+        // Find all OpcUA folders and their files
+        const opcuaFolders = new Map(); // folderPath -> files[]
         
         this.projectFiles.forEach((file, path) => {
-            if (!path.toLowerCase().endsWith('.uad')) return;
-            if (typeof file.content !== 'string') return;
-            
-            let content = file.content;
-            let modified = false;
-            
-            // Check if this is a FileVersion 7 file that needs conversion
-            if (!content.includes('FileVersion="7"') && !content.includes("FileVersion='7'")) {
-                return; // Not a version 7 file, skip
-            }
-            
-            // 1. Update FileVersion from 7 to 9
-            const newContent = content
-                // Update FileVersion
-                .replace(/FileVersion="7"/g, 'FileVersion="9"')
-                .replace(/FileVersion='7'/g, "FileVersion='9'")
-                // Remove RoleId attribute from ACE elements (keep other attributes)
-                .replace(/(<ACE\s+)RoleId=["'][^"']*["']\s+(RoleName=)/g, '$1$2')
-                .replace(/(<ACE\s+RoleName=["'][^"']*["']\s+)RoleId=["'][^"']*["']\s*/g, '$1')
-                // Replace AutomaticEnable="True" with RecursiveEnable="1"
-                .replace(/AutomaticEnable=["']True["']/gi, 'RecursiveEnable="1"')
-                // Replace EnableArrayElements="True" with RecursiveEnable="1"
-                .replace(/EnableArrayElements=["']True["']/gi, 'RecursiveEnable="1"');
-            
-            if (newContent !== content) {
-                file.content = newContent;
-                filesConverted++;
-                console.log(`Converted UAD file: ${path}`);
-                
-                // Add to analysis results
-                this.analysisResults.push({
-                    severity: 'info',
-                    category: 'opcua',
-                    name: 'OPC UA Mapping File Updated',
-                    description: 'UAD file converted from FileVersion 7 to FileVersion 9 format',
-                    file: path,
-                    autoFixed: true,
-                    details: [
-                        'FileVersion updated to 9',
-                        'RoleId attributes removed from ACE elements',
-                        'AutomaticEnable replaced with RecursiveEnable',
-                        'EnableArrayElements replaced with RecursiveEnable'
-                    ]
+            // Match paths like .../Connectivity/OpcUA/... (case-insensitive)
+            const opcuaMatch = path.match(/^(.+[\/\\]Connectivity[\/\\])OpcUA([\/\\].*)$/i);
+            if (opcuaMatch) {
+                const folderBase = opcuaMatch[1];
+                if (!opcuaFolders.has(folderBase)) {
+                    opcuaFolders.set(folderBase, []);
+                }
+                opcuaFolders.get(folderBase).push({
+                    originalPath: path,
+                    relativePath: opcuaMatch[2],
+                    file: file
                 });
             }
         });
         
-        console.log(`UAD file conversion completed: ${filesConverted} files converted`);
+        if (opcuaFolders.size === 0) {
+            console.log('No OpcUA folders found to convert');
+            return;
+        }
+        
+        console.log(`Found ${opcuaFolders.size} OpcUA folder(s) to convert to OpcUaCs`);
+        
+        // Process each OpcUA folder
+        opcuaFolders.forEach((files, folderBase) => {
+            const opcuaPath = folderBase + 'OpcUA';
+            const opcuaCsPath = folderBase + 'OpcUaCs';
+            
+            console.log(`Converting: ${opcuaPath} -> ${opcuaCsPath}`);
+            
+            // Track what we've done for reporting
+            const changes = [];
+            
+            // Process and move each file
+            files.forEach(({ originalPath, relativePath, file }) => {
+                const newPath = opcuaCsPath + relativePath;
+                
+                // Delete from old location
+                this.projectFiles.delete(originalPath);
+                
+                // Process file content based on type
+                if (typeof file.content === 'string') {
+                    const fileName = relativePath.split(/[\/\\]/).pop().toLowerCase();
+                    
+                    if (fileName === 'package.pkg') {
+                        // Update Package.pkg - change SubType and PackageType, add config files
+                        file.content = file.content
+                            .replace(/SubType="OpcUA"/gi, 'SubType="OpcUaCs"')
+                            .replace(/PackageType="OpcUA"/gi, 'PackageType="OpcUaCs"')
+                            .replace(
+                                /(<Objects>)/,
+                                '$1\n    <Object Type="File">UaCsConfig.uacfg</Object>\n    <Object Type="File">UaDvConfig.uadcfg</Object>'
+                            );
+                        changes.push('Package.pkg updated with OpcUaCs type and config files');
+                    }
+                    else if (fileName.endsWith('.uad')) {
+                        // Update UAD file to FileVersion 10 format
+                        file.content = this.convertUadToVersion10(file.content);
+                        changes.push('UAD file converted to FileVersion 10');
+                    }
+                }
+                
+                // Add to new location
+                this.projectFiles.set(newPath, file);
+            });
+            
+            // Create UaCsConfig.uacfg
+            const uaCsConfigPath = opcuaCsPath + '/UaCsConfig.uacfg';
+            this.projectFiles.set(uaCsConfigPath, {
+                content: this.getUaCsConfigTemplate(),
+                isBinary: false,
+                type: 'xml'
+            });
+            changes.push('Created UaCsConfig.uacfg');
+            
+            // Create UaDvConfig.uadcfg
+            const uaDvConfigPath = opcuaCsPath + '/UaDvConfig.uadcfg';
+            this.projectFiles.set(uaDvConfigPath, {
+                content: this.getUaDvConfigTemplate(),
+                isBinary: false,
+                type: 'xml'
+            });
+            changes.push('Created UaDvConfig.uadcfg');
+            
+            // Update parent Connectivity Package.pkg to reference OpcUaCs instead of OpcUA
+            const connectivityPkgPath = folderBase + 'Package.pkg';
+            const parentPkg = this.projectFiles.get(connectivityPkgPath);
+            if (parentPkg && typeof parentPkg.content === 'string') {
+                // Replace reference to OpcUA folder with OpcUaCs (only if not already OpcUaCs)
+                parentPkg.content = parentPkg.content
+                    .replace(/>OpcUA<(?!Cs)/g, '>OpcUaCs<')
+                    .replace(/Type="Package">OpcUA(?!Cs)/gi, 'Type="Package">OpcUaCs');
+                changes.push('Updated Connectivity Package.pkg reference to OpcUaCs');
+            }
+            
+            // Add to analysis results
+            this.analysisResults.push({
+                severity: 'info',
+                category: 'opcua',
+                name: 'OPC UA Converted to OpcUaCs',
+                description: `OpcUA folder renamed to OpcUaCs with AS6 format updates`,
+                file: opcuaCsPath,
+                autoFixed: true,
+                details: changes
+            });
+        });
+        
+        console.log('OPC UA to OpcUaCs conversion completed');
+    }
+    
+    /**
+     * Convert UAD file content from FileVersion 7/9 to FileVersion 10
+     */
+    convertUadToVersion10(content) {
+        return content
+            // Update XML processing instruction FileVersion to 6.0
+            .replace(/<\?AutomationStudio\s+FileVersion="[^"]*"\s*\?>/g, '<?AutomationStudio FileVersion="6.0"?>')
+            // Update OpcUaSource FileVersion to 10
+            .replace(/(<OpcUaSource\s+)FileVersion="[^"]*"/g, '$1FileVersion="10"')
+            // Update ACL Access values
+            .replace(/Access="0x005F"/gi, 'Access="0x10A1"')
+            .replace(/Access="0x007F"/gi, 'Access="0x10E1"')
+            // Remove RoleId attribute from ACE elements (keep RoleName)
+            .replace(/(<ACE\s+)RoleId=["'][^"']*["']\s+(RoleName=)/g, '$1$2')
+            .replace(/(<ACE\s+RoleName=["'][^"']*["']\s+)RoleId=["'][^"']*["']\s*/g, '$1')
+            // Replace AutomaticEnable="True" with RecursiveEnable="1"
+            .replace(/AutomaticEnable=["']True["']/gi, 'RecursiveEnable="1"')
+            // Replace EnableArrayElements="True" with RecursiveEnable="1"
+            .replace(/EnableArrayElements=["']True["']/gi, 'RecursiveEnable="1"');
+    }
+    
+    /**
+     * Get UaCsConfig.uacfg template content for AS6 OpcUaCs
+     */
+    getUaCsConfigTemplate() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio FileVersion="4.9"?>
+<Configuration>
+  <Element ID="ClientServerConfiguration" Type="uacfg">
+    <Property ID="OpcUaCs" Value="1" />
+    <Group ID="Network">
+      <Property ID="TcpPort" Value="4840" />
+      <Group ID="Discovery">
+        <Property ID="RegisterAtServer" Value="0" />
+        <Property ID="ServerUrl" Value="opc.tcp://" />
+        <Property ID="RegistrationInterval" Value="600" />
+      </Group>
+    </Group>
+    <Group ID="Facets">
+      <Property ID="AuditingServerFacet" Value="0" />
+    </Group>
+    <Group ID="Security">
+      <Group ID="MessageSecurity">
+        <Group ID="SecurityPolicies">
+          <Property ID="None" Value="0" />
+          <Property ID="Basic128Rsa15" Value="0" />
+          <Property ID="Basic256" Value="0" />
+          <Property ID="Aes128Sha256RsaOaep" Value="1" />
+          <Property ID="Basic256Sha256" Value="1" />
+        </Group>
+        <Group ID="Modes">
+          <Property ID="Sign" Value="0" />
+          <Property ID="SignAndEncrypt" Value="1" />
+        </Group>
+      </Group>
+      <Group ID="Authentication">
+        <Group ID="SecurityPolicies">
+          <Property ID="Basic128Rsa15" Value="0" />
+          <Property ID="Basic256" Value="0" />
+          <Property ID="Aes128Sha256RsaOaep" Value="1" />
+          <Property ID="Basic256Sha256" Value="1" />
+        </Group>
+        <Group ID="UserIdentityTokens">
+          <Property ID="AnonymousIdentityToken" Value="0" />
+          <Property ID="UserNameIdentityToken" Value="1" />
+          <Property ID="X509IdentityToken" Value="0" />
+        </Group>
+      </Group>
+      <Group ID="Authorization">
+        <Group ID="AnonymousAccess">
+          <Property ID="DefaultRole0" Value="BR_Anonymous" />
+        </Group>
+      </Group>
+      <Property ID="AppCertificateTrustListValidation" Value="1" />
+    </Group>
+    <Group ID="Limits">
+      <Group ID="General">
+        <Property ID="MaxSecureChannels" Value="100" />
+        <Property ID="MaxReferencesToReturn" Value="10000" />
+        <Property ID="MaxTranslateResults" Value="10000" />
+      </Group>
+      <Group ID="Operation">
+        <Property ID="MaxNodesPerRead" Value="65535" />
+        <Property ID="MaxNodesPerWrite" Value="65535" />
+        <Property ID="MaxNodesPerBrowse" Value="65535" />
+        <Property ID="MaxNodesPerTranslateBrowsePathsToNodeIds" Value="65535" />
+        <Property ID="MaxNodesPerRegisterNodes" Value="65535" />
+        <Property ID="MaxNodesPerMethodCall" Value="65535" />
+        <Property ID="MaxMonitoredItemsPerCall" Value="65535" />
+        <Property ID="MaxNodesPerHistoryReadData" Value="65535" />
+        <Property ID="MaxNodesPerHistoryReadEvents" Value="65535" />
+      </Group>
+      <Group ID="Session">
+        <Property ID="MaxSessions" Value="50" />
+        <Property ID="MaxSubscriptionsPerSession" Value="1000" />
+        <Property ID="MaxPublishPerSession" Value="10" />
+        <Property ID="MaxBrowseContinuationPoints" Value="5" />
+        <Property ID="MaxHistoryContinuationPoints" Value="5" />
+      </Group>
+      <Group ID="Subscription">
+        <Property ID="MaxMonitoredItemsPerSubscription" Value="10000" />
+        <Property ID="MaxDataMonitoredItemsQueueSize" Value="100" />
+        <Property ID="MaxEventMonitoredItemsQueueSize" Value="1000" />
+        <Group ID="PublishingInterval">
+          <Property ID="MinPublishingInterval" Value="50" />
+          <Property ID="MaxPublishingInterval" Value="3600000" />
+        </Group>
+        <Group ID="KeepAliveInterval">
+          <Property ID="MinKeepAliveInterval" Value="50" />
+          <Property ID="MaxKeepAliveInterval" Value="1200000" />
+        </Group>
+        <Group ID="LifetimeInterval">
+          <Property ID="MinLifetimeInterval" Value="150" />
+          <Property ID="MaxLifetimeInterval" Value="3600000" />
+        </Group>
+      </Group>
+    </Group>
+    <Group ID="Conversions">
+      <Property ID="EncodingAsciiString" Value="1" />
+      <Property ID="ImplicitTypeCast" Value="0" />
+    </Group>
+    <Group ID="Sampling">
+      <Selector ID="TimerCount">
+        <Property ID="DefaultTimer" Value="7" />
+        <Property ID="Timer1Interval" Value="10" />
+        <Property ID="Timer2Interval" Value="20" />
+        <Property ID="Timer3Interval" Value="50" />
+        <Property ID="Timer4Interval" Value="100" />
+        <Property ID="Timer5Interval" Value="200" />
+        <Property ID="Timer6Interval" Value="500" />
+        <Property ID="Timer7Interval" Value="1000" />
+        <Property ID="Timer8Interval" Value="5000" />
+      </Selector>
+    </Group>
+  </Element>
+</Configuration>`;
+    }
+    
+    /**
+     * Get UaDvConfig.uadcfg template content for AS6 OpcUaCs
+     */
+    getUaDvConfigTemplate() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio FileVersion="4.9"?>
+<Configuration>
+  <Element ID="DefaultViewConfiguration" Type="uadcfg">
+    <Group ID="InformationModels">
+      <Property ID="ComplexTypeFacet" Value="0" />
+      <Property ID="ExportTypeInformation" Value="0" />
+      <Property ID="DedicatedTypeDefinitionsForStructures" Value="0" />
+    </Group>
+    <Group ID="DefaultRolePermissions">
+      <Group ID="Role [1]">
+        <Property ID="Name" Value="Everyone" />
+        <Group ID="RolePermissions">
+          <Property ID="PermissionBrowse" Value="1" />
+          <Property ID="PermissionRead" Value="1" />
+          <Property ID="PermissionWrite" Value="1" />
+          <Property ID="PermissionCall" Value="1" />
+          <Property ID="PermissionReadRolePermissions" Value="0" />
+          <Property ID="PermissionWriteRolePermissions" Value="0" />
+          <Property ID="PermissionWriteAttribute" Value="0" />
+          <Property ID="PermissionReadHistory" Value="1" />
+        </Group>
+      </Group>
+    </Group>
+  </Element>
+</Configuration>`;
     }
 
     /**

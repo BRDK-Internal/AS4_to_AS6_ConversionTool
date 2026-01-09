@@ -156,7 +156,7 @@ const DeprecationDatabase = {
             'MpReport': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpSequence': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpUserX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MpServer': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'MpServer': { techPackage: 'mappServices', as6Version: '6.5.0', as6LibVersion: '6.5.0' },
             
             // mappView (6.0.0) - Visualization
             
@@ -192,7 +192,11 @@ const DeprecationDatabase = {
             
             // MTTypes/MTData - Motion toolbox (specific versions in AS6)
             'MTTypes': { source: 'Library_2', as6LibVersion: '6.0.0' },
-            'MTData': { source: 'Library_2', as6LibVersion: '6.4.0' },
+            'MTData': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MTBasics': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MTFilter': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MTLookUp': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'MTProfile': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MTAdvanced': { source: 'Library_2', as6LibVersion: null },
             'MTSystem': { source: 'Library_2', as6LibVersion: null },
             'MTTemp': { source: 'Library_2', as6LibVersion: null },
