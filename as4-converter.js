@@ -2352,14 +2352,22 @@ class AS4Converter {
                 // Update history file content to AS6 format
                 let historyContent = hFile.content;
                 if (typeof historyContent === 'string') {
-                    // Add the mapp.Gen group if not present
+                    // Add the mapp.Gen group if not present - generate complete AS6 format
                     if (!historyContent.includes('mapp.Gen')) {
-                        historyContent = historyContent.replace(
-                            /(<Element ID="[^"]+" Type="mpalarmxhistory")(\s*\/>|\s*>)/,
-                            '$1>\n    <Group ID="mapp.Gen">\n      <Property ID="Audit" Value="FALSE" />\n    </Group>\n  </Element'
-                        );
-                        // Fix self-closing element
-                        historyContent = historyContent.replace(/<\/Element\s*\/>/, '</Element>');
+                        // Extract the Element ID
+                        const elemIdMatch = historyContent.match(/<Element ID="([^"]+)"/);
+                        const elemId = elemIdMatch ? elemIdMatch[1] : 'mpAlarmXHistory';
+                        
+                        // Generate fresh AS6 format content
+                        historyContent = `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio FileVersion="4.9"?>
+<Configuration>
+  <Element ID="${elemId}" Type="mpalarmxhistory">
+    <Group ID="mapp.Gen">
+      <Property ID="Audit" Value="FALSE" />
+    </Group>
+  </Element>
+</Configuration>`;
                     }
                 }
                 
@@ -2402,20 +2410,20 @@ class AS4Converter {
             
             // Add new entries before </Objects>
             const newEntries = [
-                `    <Object Type="File">${baseName}_1.mpalarmxcore</Object>`,
-                `    <Object Type="File">${baseName}_C.mpalarmxcategory</Object>`,
-                `    <Object Type="File">${baseName}_L.mpalarmxlist</Object>`,
-                `    <Object Type="File">${baseName}_Q.mpalarmxquery</Object>`
+                `<Object Type="File">${baseName}_1.mpalarmxcore</Object>`,
+                `<Object Type="File">${baseName}_C.mpalarmxcategory</Object>`,
+                `<Object Type="File">${baseName}_L.mpalarmxlist</Object>`,
+                `<Object Type="File">${baseName}_Q.mpalarmxquery</Object>`
             ];
             
             if (historyConverted) {
-                newEntries.push(`    <Object Type="File">${baseName}_2.mpalarmxhistory</Object>`);
-                newEntries.push(`    <Object Type="File">${baseName}H_.mpalarmxquery</Object>`);
+                newEntries.push(`<Object Type="File">${baseName}_2.mpalarmxhistory</Object>`);
+                newEntries.push(`<Object Type="File">${baseName}H_.mpalarmxquery</Object>`);
             }
             
             pkgContent = pkgContent.replace(
                 /<\/Objects>/,
-                newEntries.join('\n') + '\n  </Objects>'
+                newEntries.map(e => '    ' + e).join('\n') + '\n  </Objects>'
             );
             
             pkgFile.content = pkgContent;
@@ -2441,17 +2449,65 @@ class AS4Converter {
         const mappingEntries = [];
         let entryIndex = 0;
         
-        // Parse each severity group
-        const groupRegex = /<Group ID="\[\d+\]">([\s\S]*?)<\/Group>/g;
-        let groupMatch;
+        // Parse each severity group - handle both self-closing and content groups
+        // Self-closing: <Group ID="[1]" />
+        // With content: <Group ID="[0]">...</Group>
+        const groupRegex = /<Group ID="\[(\d+)\]"\s*(\/?>)/g;
+        let match;
         
-        while ((groupMatch = groupRegex.exec(bySeverityContent)) !== null) {
-            const groupContent = groupMatch[1];
+        // Collect all groups with their content
+        const groups = [];
+        while ((match = groupRegex.exec(bySeverityContent)) !== null) {
+            const groupId = match[1];
+            const isSelfClosing = match[2] === '/>';
+            
+            if (isSelfClosing) {
+                groups.push({ id: groupId, content: '' });
+            } else {
+                // Find the matching closing tag by counting nested Group tags
+                let depth = 1;
+                let pos = match.index + match[0].length;
+                let contentStart = pos;
+                
+                while (depth > 0 && pos < bySeverityContent.length) {
+                    const remaining = bySeverityContent.substring(pos);
+                    const nextGroupOpen = remaining.search(/<Group\s/);
+                    const nextGroupClose = remaining.indexOf('</Group>');
+                    
+                    if (nextGroupClose === -1) break;
+                    
+                    if (nextGroupOpen !== -1 && nextGroupOpen < nextGroupClose) {
+                        // Check if the next Group tag is self-closing
+                        const groupTagEnd = remaining.indexOf('>', nextGroupOpen);
+                        if (groupTagEnd !== -1 && remaining.substring(nextGroupOpen, groupTagEnd + 1).includes('/>')) {
+                            // Self-closing nested group, don't change depth
+                            pos += groupTagEnd + 1;
+                        } else {
+                            depth++;
+                            pos += nextGroupOpen + 6;
+                        }
+                    } else {
+                        depth--;
+                        if (depth === 0) {
+                            groups.push({ 
+                                id: groupId, 
+                                content: bySeverityContent.substring(contentStart, pos + nextGroupClose)
+                            });
+                        }
+                        pos += nextGroupClose + 8;
+                    }
+                }
+            }
+        }
+        
+        // Process each group
+        for (const group of groups) {
+            const groupContent = group.content;
             
             // Extract severity value
             const severityMatch = groupContent.match(/<Property ID="Severity" Value="(\d+)"/);
             if (!severityMatch) {
-                // Empty group - create a None entry
+                // Empty group - create a None entry with empty alarm selector
                 mappingEntries.push({
                     index: entryIndex++,
                     alarm: '[]',
