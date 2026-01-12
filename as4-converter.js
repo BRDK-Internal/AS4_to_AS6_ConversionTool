@@ -2410,7 +2410,9 @@ class AS4Converter {
         }
         
         try {
-            const response = await fetch('as6-libraries-index.json');
+            // Add cache-busting to ensure fresh index is loaded
+            const cacheBuster = `?t=${Date.now()}`;
+            const response = await fetch('as6-libraries-index.json' + cacheBuster, { cache: 'no-store' });
             if (!response.ok) {
                 throw new Error(`Failed to load AS6 libraries index: ${response.status}`);
             }
@@ -2479,17 +2481,47 @@ class AS4Converter {
                     }
                 } else {
                     // Technology Package library - find the right version
+                    // First try the library's specific version (libInfo.version), then fall back to package version
                     const pkgVersions = index.TechnologyPackages?.[packageName];
-                    console.log(`    TechPkg lookup for '${packageName}' version '${pkgInfo.version}': pkgVersions exists: ${!!pkgVersions}`);
+                    const libSpecificVersion = libInfo.version; // e.g., "6.2.0" for MpServer
+                    console.log(`    TechPkg lookup for '${packageName}' lib '${libName}': libVersion='${libSpecificVersion}', pkgVersion='${pkgInfo.version}'`);
+                    
                     if (pkgVersions) {
-                        // Try exact version first, then find closest
-                        const versionData = pkgVersions[pkgInfo.version];
-                        console.log(`      Version '${pkgInfo.version}' data exists: ${!!versionData}, lib '${libName}' exists: ${!!(versionData && versionData[libName])}`);
+                        // Try library-specific version first (some libraries like MpServer only exist in certain versions)
+                        let versionData = null;
+                        let usedVersion = null;
+                        
+                        // Priority 1: Use the library's specific version from the mapping
+                        if (libSpecificVersion && pkgVersions[libSpecificVersion]?.[libName]) {
+                            versionData = pkgVersions[libSpecificVersion];
+                            usedVersion = libSpecificVersion;
+                            console.log(`      Using library-specific version '${libSpecificVersion}' for ${libName}`);
+                        }
+                        // Priority 2: Fall back to package version
+                        else if (pkgVersions[pkgInfo.version]?.[libName]) {
+                            versionData = pkgVersions[pkgInfo.version];
+                            usedVersion = pkgInfo.version;
+                            console.log(`      Using package version '${pkgInfo.version}' for ${libName}`);
+                        }
+                        // Priority 3: Search all versions to find one that contains this library
+                        else {
+                            for (const [ver, verData] of Object.entries(pkgVersions)) {
+                                if (verData[libName]) {
+                                    versionData = verData;
+                                    usedVersion = ver;
+                                    console.log(`      Found ${libName} in version '${ver}' (searched all versions)`);
+                                    break;
+                                }
+                            }
+                        }
+                        
                         if (versionData && versionData[libName]) {
                             const libData = versionData[libName];
                             files = libData.files || [];
-                            basePath = `${baseUrl}/TechnologyPackages/${packageName}/${pkgInfo.version}/Library/${libName}/${libData.version}`;
+                            basePath = `${baseUrl}/TechnologyPackages/${packageName}/${usedVersion}/Library/${libName}/${libData.version}`;
                             console.log(`      Found ${files.length} files for ${libName}, basePath: ${basePath}`);
+                        } else {
+                            console.warn(`      Library ${libName} not found in any version of ${packageName}`);
                         }
                     }
                 }
@@ -2527,7 +2559,9 @@ class AS4Converter {
                 batch.map(async (fileInfo) => {
                     const isBinary = this.isBinaryFile(fileInfo.url);
                     try {
-                        const response = await fetch(fileInfo.url);
+                        // Add cache-busting timestamp to ensure fresh files are fetched
+                        const cacheBuster = `?t=${Date.now()}`;
+                        const response = await fetch(fileInfo.url + cacheBuster, { cache: 'no-store' });
                         if (response.ok) {
                             const content = isBinary 
                                 ? await response.arrayBuffer() 

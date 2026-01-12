@@ -156,7 +156,7 @@ const DeprecationDatabase = {
             'MpReport': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpSequence': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'MpUserX': { techPackage: 'mappServices', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MpServer': { techPackage: 'mappServices', as6Version: '6.5.0', as6LibVersion: '6.5.0' },
+            'MpServer': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // mappView (6.0.0) - Visualization
             
