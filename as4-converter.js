@@ -843,6 +843,9 @@ class AS4Converter {
                 return (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3);
             });
             
+            // Auto-apply project file conversion (.apj AS4 → AS6)
+            this.autoApplyProjectFileConversion();
+            
             // Auto-apply library version updates for technology package libraries
             this.autoApplyLibraryVersionUpdates();
             
@@ -1356,7 +1359,8 @@ class AS4Converter {
                         replacement: deprecation.replacement,
                         notes: deprecation.notes,
                         file: path,
-                        original: obj.raw
+                        original: obj.raw,
+                        autoReplace: deprecation.autoReplace
                     });
                 }
             }
@@ -1491,7 +1495,8 @@ class AS4Converter {
                         replacement: deprecation.replacement,
                         notes: deprecation.notes,
                         file: path,
-                        original: match[0]
+                        original: match[0],
+                        autoReplace: deprecation.autoReplace
                     });
                 }
             }
@@ -1852,6 +1857,32 @@ class AS4Converter {
             mapping,
             needsUpgrade: isAS4Version && mapping
         });
+    }
+
+    /**
+     * Auto-apply project file conversion (.apj) from AS4 to AS6 format
+     * This includes AS version, namespace, and technology package updates
+     */
+    autoApplyProjectFileConversion() {
+        // Find the project file conversion finding
+        const projectFinding = this.analysisResults.find(f => 
+            f.type === 'project' && 
+            f.name === 'AS4 Project File' && 
+            f.conversion && 
+            f.conversion.automated
+        );
+        
+        if (!projectFinding) {
+            console.log('No project file conversion needed or found');
+            return;
+        }
+        
+        console.log('Auto-applying project file conversion:', projectFinding.file);
+        
+        // Apply the conversion using the applyConversion method
+        this.applyConversion(projectFinding.id);
+        
+        console.log('Project file conversion applied');
     }
 
     /**
@@ -4358,6 +4389,40 @@ ${mappingGroups}
         return { before, after, notes };
     }
 
+    collectUsedLibraries() {
+        const libraries = new Set();
+        
+        // Collect from Package.pkg files
+        this.projectFiles.forEach((file, path) => {
+            if (path.toLowerCase().endsWith('package.pkg')) {
+                // Extract library references from Package.pkg files
+                const objectPattern = /<Object\s+([^>]*)>([^<]*)<\/Object>/gi;
+                let match;
+                while ((match = objectPattern.exec(file.content)) !== null) {
+                    const attrs = match[1];
+                    const objectName = match[2].trim();
+                    const typeMatch = attrs.match(/Type="([^"]+)"/);
+                    if (typeMatch && typeMatch[1] === 'Library') {
+                        libraries.add(objectName);
+                    }
+                }
+            }
+        });
+        
+        // Collect from .sw files
+        this.projectFiles.forEach((file, path) => {
+            if (path.toLowerCase().endsWith('.sw')) {
+                const libraryPattern = /<LibraryObject\s+[^>]*Name="([^"]+)"/gi;
+                let match;
+                while ((match = libraryPattern.exec(file.content)) !== null) {
+                    libraries.add(match[1]);
+                }
+            }
+        });
+        
+        return Array.from(libraries);
+    }
+
     applyConversion(findingId) {
         const finding = this.analysisResults.find(f => f.id === findingId);
         if (!finding) {
@@ -4397,7 +4462,9 @@ ${mappingGroups}
         // Handle different conversion types
         if (finding.type === 'project' && finding.name === 'AS4 Project File') {
             // Full project file conversion using the database method
-            convertedContent = DeprecationDatabase.convertProjectFileToAS6(originalContent);
+            // Collect libraries used in the project for subVersion generation
+            const usedLibraries = this.collectUsedLibraries();
+            convertedContent = DeprecationDatabase.convertProjectFileToAS6(originalContent, { usedLibraries });
         } else if (finding.type === 'compiler' && finding.conversion) {
             // GCC compiler version replacement
             convertedContent = originalContent.replace(
@@ -4481,10 +4548,45 @@ ${mappingGroups}
             const oldLib = finding.name;
             const newLib = finding.replacement.name;
             
-            // Replace LIBRARY declaration: LIBRARY AsString → LIBRARY AsBrStr
-            const escapedOld = oldLib.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const pattern = new RegExp(`(\\{?\\s*LIBRARY\\s+)${escapedOld}(\\s*\\}?)`, 'gi');
-            convertedContent = originalContent.replace(pattern, `$1${newLib}$2`);
+            // Check if this is a Package.pkg file
+            if (finding.file.toLowerCase().endsWith('package.pkg')) {
+                // For Package.pkg files, check if the replacement library already exists
+                // If so, remove the deprecated library entry instead of renaming
+                const newLibPattern = new RegExp(`>\\s*${newLib}\\s*<\\/Object>`, 'i');
+                const oldLibLinePattern = new RegExp(`\\s*<Object[^>]*>\\s*${oldLib}\\s*<\\/Object>\\s*\\n?`, 'gi');
+                
+                if (newLibPattern.test(originalContent)) {
+                    // Replacement library already exists - remove the deprecated library entry
+                    convertedContent = originalContent.replace(oldLibLinePattern, '');
+                    console.log(`Removed duplicate library entry '${oldLib}' from Package.pkg (replacement '${newLib}' already exists)`);
+                } else {
+                    // Replacement library doesn't exist - rename the deprecated library
+                    const escapedOld = oldLib.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const pattern = new RegExp(`>\\s*${escapedOld}\\s*<\\/Object>`, 'gi');
+                    convertedContent = originalContent.replace(pattern, `>${newLib}</Object>`);
+                }
+            } else if (finding.file.toLowerCase().endsWith('.sw')) {
+                // For .sw files, check if the replacement library already exists
+                // Format: <LibraryObject Name="AsBrStr" ... />
+                const newLibPattern = new RegExp(`<LibraryObject\\s+[^>]*Name="${newLib}"`, 'i');
+                const oldLibLinePattern = new RegExp(`\\s*<LibraryObject\\s+[^>]*Name="${oldLib}"[^>]*\\/>\\s*\\n?`, 'gi');
+                
+                if (newLibPattern.test(originalContent)) {
+                    // Replacement library already exists - remove the deprecated library entry
+                    convertedContent = originalContent.replace(oldLibLinePattern, '');
+                    console.log(`Removed duplicate library entry '${oldLib}' from .sw file (replacement '${newLib}' already exists)`);
+                } else {
+                    // Replacement library doesn't exist - rename the deprecated library
+                    const escapedOld = oldLib.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const pattern = new RegExp(`(Name=")${escapedOld}(")`, 'gi');
+                    convertedContent = originalContent.replace(pattern, `$1${newLib}$2`);
+                }
+            } else {
+                // Replace LIBRARY declaration in code files: LIBRARY AsString → LIBRARY AsBrStr
+                const escapedOld = oldLib.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const pattern = new RegExp(`(\\{?\\s*LIBRARY\\s+)${escapedOld}(\\s*\\}?)`, 'gi');
+                convertedContent = originalContent.replace(pattern, `$1${newLib}$2`);
+            }
             
             // Track library replacements
             this.libraryReplacements = this.libraryReplacements || new Map();

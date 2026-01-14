@@ -1423,7 +1423,7 @@ const DeprecationDatabase = {
 `;
         
         // Add converted technology packages
-        const convertedPackages = this.convertTechnologyPackages(techPackages);
+        const convertedPackages = this.convertTechnologyPackages(techPackages, options.usedLibraries);
         convertedPackages.forEach(pkg => {
             if (pkg.subVersions) {
                 let attrs = Object.entries(pkg.subVersions).map(([k, v]) => `${k}="${v}"`).join(' ');
@@ -1463,8 +1463,10 @@ const DeprecationDatabase = {
 
     /**
      * Convert AS4 technology packages to AS6 versions
+     * @param {Array} as4Packages - Technology packages from AS4 project
+     * @param {Array} usedLibraries - List of libraries actually used in the project
      */
-    convertTechnologyPackages(as4Packages) {
+    convertTechnologyPackages(as4Packages, usedLibraries = []) {
         const as6Packages = [];
         const tpRef = this.as6Format.technologyPackages;
         
@@ -1472,24 +1474,43 @@ const DeprecationDatabase = {
             const ref = tpRef[pkg.name];
             
             if (ref) {
+                let subVersions = ref.subVersions || null;
+                let version = ref.as6Version;
+                let name = pkg.name;
+                
                 if (ref.replacedBy) {
                     // Package was renamed/replaced
                     const replacement = tpRef[ref.replacedBy];
-                    as6Packages.push({
-                        name: ref.replacedBy,
-                        version: replacement.as6Version,
-                        subVersions: replacement.subVersions || null,
-                        note: `Replaced ${pkg.name} with ${ref.replacedBy}`
-                    });
-                } else if (ref.as6Version) {
-                    // Direct version upgrade
-                    as6Packages.push({
-                        name: pkg.name,
-                        version: ref.as6Version,
-                        subVersions: ref.subVersions || null,
-                        note: `Upgraded from ${pkg.version} to ${ref.as6Version}`
-                    });
+                    name = ref.replacedBy;
+                    version = replacement.as6Version;
+                    subVersions = replacement.subVersions || null;
                 }
+                
+                // Build subVersions dynamically for packages with libraries
+                if (usedLibraries && usedLibraries.length > 0) {
+                    const libMapping = this.as6Format.libraryMapping;
+                    const packageLibs = {};
+                    
+                    usedLibraries.forEach(libName => {
+                        const mapping = libMapping[libName];
+                        if (mapping && mapping.techPackage === name) {
+                            // This library belongs to this tech package and should be a subVersion
+                            packageLibs[libName] = mapping.as6LibVersion || version;
+                        }
+                    });
+                    
+                    // Only set subVersions if we found any libraries for this package
+                    if (Object.keys(packageLibs).length > 0) {
+                        subVersions = packageLibs;
+                    }
+                }
+                
+                as6Packages.push({
+                    name: name,
+                    version: version,
+                    subVersions: subVersions,
+                    note: ref.replacedBy ? `Replaced ${pkg.name} with ${name}` : `Upgraded from ${pkg.version} to ${version}`
+                });
             } else {
                 // Unknown package - keep with warning
                 as6Packages.push({
@@ -1505,10 +1526,31 @@ const DeprecationDatabase = {
             if (ref.newInAS6 && ref.required !== false) {
                 const exists = as6Packages.some(p => p.name === name);
                 if (!exists) {
+                    let subVersions = ref.subVersions || null;
+                    
+                    // Build subVersions dynamically if we have library information
+                    if (usedLibraries && usedLibraries.length > 0) {
+                        const libMapping = this.as6Format.libraryMapping;
+                        const packageLibs = {};
+                        
+                        usedLibraries.forEach(libName => {
+                            const mapping = libMapping[libName];
+                            if (mapping && mapping.techPackage === name) {
+                                // This library belongs to this tech package and should be a subVersion
+                                packageLibs[libName] = mapping.as6LibVersion || ref.as6Version;
+                            }
+                        });
+                        
+                        // Only set subVersions if we found any libraries for this package
+                        if (Object.keys(packageLibs).length > 0) {
+                            subVersions = packageLibs;
+                        }
+                    }
+                    
                     as6Packages.push({
                         name: name,
                         version: ref.as6Version,
-                        subVersions: ref.subVersions || null,
+                        subVersions: subVersions,
                         note: 'New AS6 package added'
                     });
                 }
