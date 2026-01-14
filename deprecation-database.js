@@ -179,16 +179,19 @@ const DeprecationDatabase = {
             'Acp10man': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'Acp10par': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'Acp10sim': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            'Acp10sdc': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             'NcGlobal': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // MpBase - Core mapp component (in Library_2 with version subfolder)
             'MpBase': { source: 'Library_2', as6LibVersion: 'V6.5.0' },
             
             // mappSafety (6.2.0) - Safety libraries
+            // NOTE: Only SfDomain is included in the bundled libraries.
+            // SafeLOGIC, SafeMOTION, and MpSafety require installation from AS6 or B&R downloads
             'SfDomain': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
-            'SafeLOGIC': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
-            'SafeMOTION': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
-            'MpSafety': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
+            // 'SafeLOGIC': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' }, // Not bundled
+            // 'SafeMOTION': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' }, // Not bundled
+            // 'MpSafety': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' }, // Not bundled
             
             // MTTypes/MTData - Motion toolbox (specific versions in AS6)
             'MTTypes': { source: 'Library_2', as6LibVersion: '6.0.0' },
@@ -231,7 +234,15 @@ const DeprecationDatabase = {
             'ArProject': { source: 'Library_2', as6LibVersion: null },
             'ArUser': { source: 'Library_2', as6LibVersion: null },
             'ArSsl': { source: 'Library_2', as6LibVersion: null },
-            'powerlnk': { source: 'Library_2', as6LibVersion: null }
+            'powerlnk': { source: 'Library_2', as6LibVersion: null },
+            
+            // Additional common libraries
+            'AsIOAcc': { source: 'Library_2', as6LibVersion: null },
+            'AsEPL': { source: 'Library_2', as6LibVersion: null },
+            'AsARCfg': { source: 'Library_2', as6LibVersion: null },
+            'ArTextSys': { source: 'Library_2', as6LibVersion: null },
+            'dvframe': { source: 'Library_2', as6LibVersion: null },
+            'AsString': { source: 'Library_2', as6LibVersion: null }  // Note: AsString is deprecated, use AsBrStr
         },
         
         // Visual Components support in AS6
@@ -845,20 +856,55 @@ const DeprecationDatabase = {
         {
             id: "lib_asstring",
             name: "AsString",
-            severity: "error",
+            severity: "warning",
             category: "utilities",
-            description: "String manipulation library - superseded",
-            replacement: { name: "AsBrStr", description: "Modern string library with Unicode support" },
-            notes: "AsBrStr provides enhanced string functions with internationalization.",
-            removedIn: "AS5.0",
+            description: "ANSI C string library - deprecated in AS6, replaced by AsBrStr",
+            replacement: { name: "AsBrStr", description: "B&R string library with full Unicode support" },
+            notes: "AsString library must be replaced with AsBrStr. All AsString functions have direct AsBrStr equivalents with 'brs' prefix (e.g., strlen → brsstrlen). The library replacement and function renaming will be handled automatically.",
+            removedIn: "AS6.0",
+            autoReplace: true,
+            libraryPath: "LibrariesForAS6/Library_2/AsBrStr",
             functionMappings: [
-                { old: "strlen", new: "brsstrlen", notes: "Return type may differ" },
-                { old: "strcpy", new: "brsstrcpy", notes: "Same interface" },
-                { old: "strcat", new: "brsstrcat", notes: "Same interface" },
-                { old: "strcmp", new: "brsstrcmp", notes: "Same interface" },
-                { old: "strncpy", new: "brsstrncpy", notes: "Same interface" },
-                { old: "atoi", new: "brsatoi", notes: "Same interface" },
-                { old: "itoa", new: "brsitoa", notes: "Same interface" }
+                { old: "ftoa", new: "brsftoa", notes: "Same interface - converts REAL to string" },
+                { old: "atof", new: "brsatof", notes: "Same interface - converts string to REAL" },
+                { old: "atod", new: "brsatod", notes: "Same interface - converts string to LREAL" },
+                { old: "itoa", new: "brsitoa", notes: "Same interface - converts DINT to string" },
+                { old: "atoi", new: "brsatoi", notes: "Same interface - converts string to DINT" },
+                { old: "memset", new: "brsmemset", notes: "Same interface - fills memory with value" },
+                { old: "memcpy", new: "brsmemcpy", notes: "Same interface - copies memory area" },
+                { old: "memmove", new: "brsmemmove", notes: "Same interface - copies overlapping memory" },
+                { old: "memcmp", new: "brsmemcmp", notes: "Same interface - compares memory areas" },
+                { old: "strcat", new: "brsstrcat", notes: "Same interface - concatenates strings" },
+                { old: "strlen", new: "brsstrlen", notes: "Same interface - returns string length" },
+                { old: "strcpy", new: "brsstrcpy", notes: "Same interface - copies string" },
+                { old: "strcmp", new: "brsstrcmp", notes: "Same interface - compares strings" }
+            ]
+        },
+        {
+            id: "lib_aswstr",
+            name: "AsWStr",
+            severity: "warning",
+            category: "utilities",
+            description: "Wide string library - deprecated in AS6, replaced by AsBrWStr",
+            replacement: { name: "AsBrWStr", description: "B&R wide string library" },
+            notes: "AsWStr library must be replaced with AsBrWStr. Wide string functions have 'brw' prefix.",
+            removedIn: "AS6.0",
+            autoReplace: true,
+            libraryPath: "LibrariesForAS6/Library_2/AsBrWStr",
+            functionMappings: [
+                { old: "wcscat", new: "brwcscat", notes: "Same interface - concatenates wide strings" },
+                { old: "wcschr", new: "brwcschr", notes: "Same interface - finds character in wide string" },
+                { old: "wcscmp", new: "brwcscmp", notes: "Same interface - compares wide strings" },
+                { old: "wcsconv", new: "brwcsconv", notes: "Same interface - converts wide string" },
+                { old: "wcscpy", new: "brwcscpy", notes: "Same interface - copies wide string" },
+                { old: "wcslen", new: "brwcslen", notes: "Same interface - returns wide string length" },
+                { old: "wcsncat", new: "brwcsncat", notes: "Same interface - concatenates n wide chars" },
+                { old: "wcsncmp", new: "brwcsncmp", notes: "Same interface - compares n wide chars" },
+                { old: "wcsncpy", new: "brwcsncpy", notes: "Same interface - copies n wide chars" },
+                { old: "wcsrchr", new: "brwcsrchr", notes: "Same interface - finds last char in wide string" },
+                { old: "wcsset", new: "brwcsset", notes: "Same interface - sets wide string chars" },
+                { old: "U8toUC", new: "brwU8toUC", notes: "UTF-8 to Unicode conversion" },
+                { old: "UCtoU8", new: "brwUCtoU8", notes: "Unicode to UTF-8 conversion" }
             ]
         },
         {

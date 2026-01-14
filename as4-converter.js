@@ -937,10 +937,21 @@ class AS4Converter {
                     line: this.getLineNumber(content, match.index),
                     context: this.getCodeContext(content, match.index),
                     original: match[0],
-                    functionMappings: deprecation.functionMappings
+                    functionMappings: deprecation.functionMappings,
+                    autoReplace: deprecation.autoReplace || false,
+                    libraryPath: deprecation.libraryPath || null
                 });
+                
+                // Track libraries that need function replacement scanning
+                if (deprecation.autoReplace && deprecation.functionMappings && deprecation.functionMappings.length > 0) {
+                    this.librariesForFunctionReplacement = this.librariesForFunctionReplacement || new Set();
+                    this.librariesForFunctionReplacement.add(libName);
+                }
             }
         }
+        
+        // Check for deprecated library function calls (AsString, AsWStr, etc.)
+        this.scanForDeprecatedFunctionCalls(path, content);
         
         // Check for function calls that match deprecated functions
         DeprecationDatabase.functions.forEach(func => {
@@ -985,6 +996,60 @@ class AS4Converter {
                 } : null
             });
         });
+    }
+
+    /**
+     * Scan source code for deprecated library function calls (AsString → AsBrStr, etc.)
+     * This is called during analysis to detect function calls that need replacement
+     */
+    scanForDeprecatedFunctionCalls(path, content) {
+        // Get all libraries with function mappings that need replacement
+        const librariesWithMappings = DeprecationDatabase.libraries.filter(
+            lib => lib.autoReplace && lib.functionMappings && lib.functionMappings.length > 0
+        );
+        
+        librariesWithMappings.forEach(lib => {
+            lib.functionMappings.forEach(mapping => {
+                // Create regex pattern to match function calls: functionName(
+                // Use word boundary to avoid matching partial names
+                const pattern = new RegExp(`\\b${this.escapeRegex(mapping.old)}\\s*\\(`, 'gi');
+                let match;
+                
+                while ((match = pattern.exec(content)) !== null) {
+                    this.addFinding({
+                        type: 'deprecated_function_call',
+                        name: mapping.old,
+                        severity: 'warning',
+                        description: `Deprecated function from ${lib.name}: ${mapping.old} → ${mapping.new}`,
+                        replacement: { 
+                            name: mapping.new, 
+                            description: mapping.notes 
+                        },
+                        notes: `Function ${mapping.old} is part of deprecated ${lib.name} library. Replace with ${mapping.new} from ${lib.replacement?.name || 'new library'}.`,
+                        file: path,
+                        line: this.getLineNumber(content, match.index),
+                        context: this.getCodeContext(content, match.index),
+                        original: match[0],
+                        autoReplace: true,
+                        parentLibrary: lib.name,
+                        newLibrary: lib.replacement?.name,
+                        conversion: {
+                            type: 'function_call',
+                            from: mapping.old,
+                            to: mapping.new,
+                            automated: true
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    /**
+     * Escape special regex characters in a string
+     */
+    escapeRegex(str) {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     analyzeXML(path, content) {
@@ -2886,6 +2951,40 @@ ${mappingGroups}
         
         console.log(`Detected ${detectedLibraries.size} library references:`, Array.from(detectedLibraries).join(', '));
         
+        // Check for deprecated libraries that need replacement (AsString → AsBrStr, etc.)
+        // Add their replacement libraries to the detected set ONLY if not already present
+        const deprecatedLibraryReplacements = new Map();
+        detectedLibraries.forEach(libName => {
+            const deprecation = DeprecationDatabase.findLibrary(libName);
+            if (deprecation && deprecation.autoReplace && deprecation.replacement) {
+                const replacementLib = deprecation.replacement.name;
+                // Only add replacement if it's not already in the project
+                const replacementLibLower = replacementLib.toLowerCase();
+                const alreadyExists = Array.from(detectedLibraries).some(
+                    lib => lib.toLowerCase() === replacementLibLower
+                );
+                if (!alreadyExists) {
+                    deprecatedLibraryReplacements.set(libName, replacementLib);
+                    console.log(`  Deprecated library '${libName}' -> replacement '${replacementLib}' will be added`);
+                } else {
+                    console.log(`  Deprecated library '${libName}' -> replacement '${replacementLib}' already exists in project, skipping`);
+                    // Still track the replacement for function renaming purposes
+                    deprecatedLibraryReplacements.set(libName, replacementLib);
+                }
+            }
+        });
+        
+        // Add replacement libraries to detected set (only if not already present)
+        deprecatedLibraryReplacements.forEach((replacementLib, oldLib) => {
+            const replacementLibLower = replacementLib.toLowerCase();
+            const alreadyExists = Array.from(detectedLibraries).some(
+                lib => lib.toLowerCase() === replacementLibLower
+            );
+            if (!alreadyExists) {
+                detectedLibraries.add(replacementLib);
+            }
+        });
+        
         // Add all detected libraries to required packages
         detectedLibraries.forEach(libName => {
             const libNameLower = libName.toLowerCase();
@@ -2897,6 +2996,9 @@ ${mappingGroups}
                 console.log(`  Library '${libName}' -> NO MAPPING (customized library, will not be replaced)`);
             }
         });
+        
+        // Store deprecated library replacements for later use
+        this.deprecatedLibraryReplacements = deprecatedLibraryReplacements;
         
         console.log(`Required packages: ${requiredPackages.size}`);
         requiredPackages.forEach((pkg, name) => {
@@ -3069,6 +3171,10 @@ ${mappingGroups}
         }
         
         console.log(`Fetching ${filesToFetch.length} AS6 library files...`);
+        if (filesToFetch.length > 0) {
+            console.log('First 10 files to fetch:');
+            filesToFetch.slice(0, 10).forEach((f, i) => console.log(`  ${i+1}. ${f.url} -> ${f.targetPath}`));
+        }
         
         // Fetch files in batches to avoid overwhelming the browser
         const batchSize = 20;
@@ -3094,9 +3200,11 @@ ${mappingGroups}
                                 isBinary,
                                 success: true 
                             };
+                        } else {
+                            console.warn(`Failed to fetch ${fileInfo.url}: HTTP ${response.status}`);
                         }
                     } catch (e) {
-                        // File fetch failed
+                        console.warn(`Error fetching ${fileInfo.url}:`, e.message);
                     }
                     return { path: fileInfo.targetPath, success: false };
                 })
@@ -3118,6 +3226,10 @@ ${mappingGroups}
         }
         
         console.log(`Successfully fetched ${fetched}/${filesToFetch.length} AS6 library files`);
+        if (fetched === 0 && filesToFetch.length > 0) {
+            console.error('WARNING: No library files were fetched! Check browser console for fetch errors.');
+            console.error('Make sure you are running this tool via a web server (not file:// protocol).');
+        }
         return libraryFiles;
     }
 
@@ -3271,6 +3383,13 @@ ${mappingGroups}
             `;
             return;
         }
+        
+        // Assign unique IDs to all findings if not present
+        this.analysisResults.forEach((finding, index) => {
+            if (!finding.id) {
+                finding.id = `finding_${index}_${Date.now()}`;
+            }
+        });
         
         this.elements.analysisEmpty.classList.add('hidden');
         this.elements.analysisResults.classList.remove('hidden');
@@ -3606,6 +3725,7 @@ ${mappingGroups}
             library_version: '📚',
             function: '⚙️',
             function_block: '🧩',
+            deprecated_function_call: '🔄',
             hardware: '🔌',
             project: '📁',
             technology_package: '📦',
@@ -3626,6 +3746,7 @@ ${mappingGroups}
             library_version: 'Library Versions',
             function: 'Functions',
             function_block: 'Function Blocks',
+            deprecated_function_call: 'Deprecated Function Calls',
             hardware: 'Hardware Modules',
             project: 'Project Format',
             technology_package: 'Technology Packages',
@@ -3751,9 +3872,14 @@ ${mappingGroups}
     }
 
     generateConversion(finding) {
-        let before = finding.context || finding.original;
+        let before = finding.context || finding.original || '';
         let after = before;
         let notes = '';
+        
+        // If no context/original available, return null to signal no conversion possible
+        if (!before && finding.type !== 'project') {
+            return { before: null, after: null, notes: 'No source context available for conversion.' };
+        }
         
         if (finding.type === 'project' && finding.name === 'AS4 Project File') {
             // Full project file conversion to AS6 format
@@ -3811,13 +3937,38 @@ ${mappingGroups}
 
     applyConversion(findingId) {
         const finding = this.analysisResults.find(f => f.id === findingId);
-        if (!finding) return;
+        if (!finding) {
+            console.warn('applyConversion: Finding not found for ID:', findingId);
+            return;
+        }
         
         const file = this.projectFiles.get(finding.file);
-        if (!file) return;
+        if (!file) {
+            console.warn('applyConversion: File not found:', finding.file);
+            return;
+        }
+        
+        // Skip binary files - they can't be text-converted
+        if (file.isBinary) {
+            console.warn('applyConversion: Skipping binary file:', finding.file);
+            finding.status = 'skipped';
+            finding.notes = (finding.notes || '') + ' (Binary file - manual conversion required)';
+            this.updatePreviewItem(findingId, false);
+            return;
+        }
         
         // Store original for undo
         const originalContent = file.content;
+        
+        // Ensure content is a string
+        if (typeof originalContent !== 'string') {
+            console.warn('applyConversion: File content is not a string:', finding.file);
+            finding.status = 'skipped';
+            finding.notes = (finding.notes || '') + ' (Non-text content - manual conversion required)';
+            this.updatePreviewItem(findingId, false);
+            return;
+        }
+        
         let convertedContent;
         
         // Handle different conversion types
@@ -3888,9 +4039,56 @@ ${mappingGroups}
             // Track variable replacements for cross-file consistency
             this.functionBlockReplacements = this.functionBlockReplacements || new Map();
             this.functionBlockReplacements.set(oldName, newName);
+        } else if (finding.type === 'deprecated_function_call' && finding.conversion && finding.autoReplace) {
+            // Deprecated library function call replacement (AsString → AsBrStr functions)
+            const oldFunc = finding.conversion.from;
+            const newFunc = finding.conversion.to;
+            
+            // Replace function call: oldFunc( → newFunc(
+            // Use regex to match word boundary to avoid partial replacements
+            const escapedOld = oldFunc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`\\b${escapedOld}\\s*\\(`, 'g');
+            convertedContent = originalContent.replace(pattern, `${newFunc}(`);
+            
+            // Track function replacements for reporting
+            this.functionReplacements = this.functionReplacements || new Map();
+            this.functionReplacements.set(oldFunc, newFunc);
+        } else if (finding.type === 'library' && finding.autoReplace && finding.replacement) {
+            // Library reference replacement (e.g., AsString → AsBrStr in LIBRARY declarations)
+            const oldLib = finding.name;
+            const newLib = finding.replacement.name;
+            
+            // Replace LIBRARY declaration: LIBRARY AsString → LIBRARY AsBrStr
+            const escapedOld = oldLib.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const pattern = new RegExp(`(\\{?\\s*LIBRARY\\s+)${escapedOld}(\\s*\\}?)`, 'gi');
+            convertedContent = originalContent.replace(pattern, `$1${newLib}$2`);
+            
+            // Track library replacements
+            this.libraryReplacements = this.libraryReplacements || new Map();
+            this.libraryReplacements.set(oldLib, newLib);
         } else {
             // Standard text replacement conversion
             const conversion = this.generateConversion(finding);
+            
+            // Ensure conversion has valid before/after values
+            if (!conversion || !conversion.before || !conversion.after) {
+                // This is expected for informational findings that don't require code changes
+                // console.log('applyConversion: Skipping finding (no conversion available):', findingId);
+                finding.status = 'skipped';
+                finding.notes = (finding.notes || '') + ' (Informational - no automatic conversion needed)';
+                this.updatePreviewItem(findingId, false);
+                return;
+            }
+            
+            // Check if before and after are the same (no actual change)
+            if (conversion.before === conversion.after) {
+                // console.log('applyConversion: No change needed for finding:', findingId);
+                finding.status = 'skipped';
+                finding.notes = (finding.notes || '') + ' (No change needed)';
+                this.updatePreviewItem(findingId, false);
+                return;
+            }
+            
             convertedContent = originalContent.replace(conversion.before, conversion.after);
         }
         
@@ -3976,14 +4174,36 @@ ${mappingGroups}
     applyAllConversions() {
         console.log('applyAllConversions called, selectedFindings:', this.selectedFindings.size);
         
+        let successCount = 0;
+        let skipCount = 0;
+        let errorCount = 0;
+        
         try {
             this.selectedFindings.forEach(id => {
                 if (!this.appliedConversions.has(id)) {
-                    this.applyConversion(id);
+                    try {
+                        this.applyConversion(id);
+                        // Check if it was skipped or applied
+                        const finding = this.analysisResults.find(f => f.id === id);
+                        if (finding && finding.status === 'skipped') {
+                            skipCount++;
+                        } else {
+                            successCount++;
+                        }
+                    } catch (convError) {
+                        console.error('Error applying conversion for ID:', id, convError);
+                        errorCount++;
+                        // Mark the finding as having an error
+                        const finding = this.analysisResults.find(f => f.id === id);
+                        if (finding) {
+                            finding.status = 'error';
+                            finding.notes = (finding.notes || '') + ` (Error: ${convError.message})`;
+                        }
+                    }
                 }
             });
             
-            console.log('All conversions applied, generating report...');
+            console.log(`Conversions complete: ${successCount} applied, ${skipCount} skipped, ${errorCount} errors`);
             
             // Generate report
             this.generateReport();
@@ -4110,10 +4330,17 @@ ${mappingGroups}
         ` : '<p>No changes applied yet.</p>';
         
         // Render recommendations
+        const hasLibraryReplacements = this.deprecatedLibraryReplacements && this.deprecatedLibraryReplacements.size > 0;
+        const libraryReplacementNotes = hasLibraryReplacements ? 
+            Array.from(this.deprecatedLibraryReplacements.entries())
+                .map(([old, newLib]) => `<li class="info">🔄 Library ${old} → ${newLib}: Function calls and library references have been updated.</li>`)
+                .join('') : '';
+        
         this.elements.reportRecommendations.innerHTML = `
             <ul class="recommendations-list">
                 ${report.bySeveity.error > 0 ? '<li class="error">⚠️ Address all ERROR severity items before migrating to AS6.</li>' : ''}
                 ${report.bySeveity.warning > 0 ? '<li class="warning">📋 Review WARNING items and plan updates accordingly.</li>' : ''}
+                ${libraryReplacementNotes}
                 <li>✅ Test all converted code thoroughly in AS6 environment.</li>
                 <li>📚 Consult B&R documentation for detailed migration guides.</li>
                 <li>💾 Keep backups of original AS4 project files.</li>
@@ -4423,6 +4650,11 @@ ${mappingGroups}
             });
             
             console.log(`=== Fetched ${as6LibraryFiles.size} AS6 library files ===`);
+            if (as6LibraryFiles.size > 0) {
+                // Show first 10 files that were fetched
+                const fileList = Array.from(as6LibraryFiles.keys());
+                console.log('First 10 fetched files:', fileList.slice(0, 10));
+            }
             
             // Add AS6 library files to the ZIP (in Logical/Libraries folder)
             // Need to determine the project folder prefix from existing files
@@ -4437,8 +4669,43 @@ ${mappingGroups}
             
             console.log(`Project folder prefix: "${projectFolderPrefix}"`);
             
+            // Build a set of existing library paths that are NOT being replaced with AS6 versions
+            // Libraries in techPackageLibraries are being replaced, so they should NOT be in existingLibraryPaths
+            const existingLibraryPaths = new Set();
+            for (const [path] of this.projectFiles) {
+                const pathLower = path.toLowerCase();
+                if (pathLower.includes('/libraries/') || pathLower.includes('\\libraries\\')) {
+                    // Extract the relative library path (e.g., "Libraries/AsBrStr/...")
+                    const libMatch = pathLower.match(/libraries[/\\]([^/\\]+)/i);
+                    if (libMatch) {
+                        const libName = libMatch[1].toLowerCase();
+                        // Only mark as "existing" if this library is NOT being replaced with an AS6 version
+                        // Libraries in techPackageLibraries are being replaced, so we should add the AS6 version
+                        if (!techPackageLibraries.has(libName)) {
+                            existingLibraryPaths.add(libName);
+                        }
+                    }
+                }
+            }
+            console.log(`Existing libraries NOT being replaced: ${Array.from(existingLibraryPaths).join(', ')}`);
+            console.log(`Libraries being replaced with AS6 versions: ${Array.from(techPackageLibraries).join(', ')}`);
+            
             let addedLibFiles = 0;
+            let skippedLibFiles = 0;
             for (const [relativePath, fileData] of as6LibraryFiles) {
+                // Check if this library already exists in the project AND is NOT being replaced
+                const libMatch = relativePath.match(/^Libraries[/\\]([^/\\]+)/i);
+                const libName = libMatch ? libMatch[1].toLowerCase() : null;
+                
+                if (libName && existingLibraryPaths.has(libName)) {
+                    // Skip - library already exists in project and is NOT being replaced
+                    if (skippedLibFiles < 3) {
+                        console.log(`  Skipping (already exists and not being replaced): ${relativePath}`);
+                    }
+                    skippedLibFiles++;
+                    continue;
+                }
+                
                 const zipPath = `${projectFolderPrefix}Logical/${relativePath}`;
                 if (addedLibFiles < 5) {
                     console.log(`  Adding: ${zipPath} (binary: ${fileData.isBinary})`);
@@ -4450,7 +4717,14 @@ ${mappingGroups}
                 }
                 addedLibFiles++;
             }
-            console.log(`Added ${addedLibFiles} AS6 library files to ZIP (prefix: ${projectFolderPrefix})`);
+            console.log(`Added ${addedLibFiles} AS6 library files to ZIP, skipped ${skippedLibFiles} (custom libraries not being replaced)`);
+            
+            // Show warning if no library files were added despite having packages to fetch
+            if (addedLibFiles === 0 && as6LibraryFiles.size === 0) {
+                console.error('WARNING: No AS6 library files were fetched. The converted project may be missing required libraries.');
+                console.error('Please ensure you are running this tool via a web server (not file:// protocol).');
+                console.error('Check the browser console for any fetch errors.');
+            }
         } else {
             console.log('=== No required packages, skipping AS6 library fetch ===');
         }
