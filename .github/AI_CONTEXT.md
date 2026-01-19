@@ -62,12 +62,20 @@ This is a web-based tool for converting B&R Automation Studio 4 (AS4) projects t
 | Type | Icon | Description |
 |------|------|-------------|
 | `library` | 📚 | Library reference replacements |
-| `deprecated_function_call` | ⚠️ | Function name replacements |
+| `deprecated_function_call` | 🔄 | Function name replacements |
 | `deprecated_constant` | 🔢 | Constant name replacements |
+| `deprecated_function_block` | 🚫 | Removed function blocks (unsupported in AS6) |
 | `project` | 📁 | Project file (.apj) conversion |
 | `technology_package` | 📦 | Tech package version updates |
 
 ## Important Behaviors
+
+### Deprecated Function Block Removal
+For function blocks not supported in AS6 (e.g., `MpAlarmXAcknowledgeAll`):
+1. **Step 1**: Find instances in `.var` and `.typ` files and replace with commented declaration
+2. **Step 2**: Collect all instance names
+3. **Step 3**: Comment out all usages in source files (`.st`, `.c`, etc.) with `(* AS6-REMOVED: ... *)` and `// TODO:` marker
+4. Programmers can search for "AS6-REMOVED" or "TODO: MpAlarmXAcknowledgeAll" to find what needs reimplementation
 
 ### Duplicate Library Detection
 When replacing libraries in Package.pkg or .sw files:
@@ -190,3 +198,17 @@ Technology packages are in:
 5. Added complete AsMath → AsBrMath conversion with functions and constants
 6. Added AS version display in UI with AS6 project blocking
 7. Added warning banner CSS styling
+8. Added `wrapWith` support for function mappings (e.g., strlen → UDINT_TO_UINT(brsstrlen(...)))
+9. Added deprecated function block removal (MpAlarmXAcknowledgeAll - removes from .var/.typ, comments out usages)
+10. Added OPC UA role configuration - extracts roles from Role.role files and adds them to UaDvConfig.uadcfg with all permissions enabled
+
+## OPC UA Role Configuration
+
+When converting OPC UA (OpcUA → OpcUaCs):
+- Roles are extracted from `Role.role` files in the project
+- Each role is added to `UaDvConfig.uadcfg` in the `DefaultRolePermissions` group
+- All 8 permissions are enabled for each role:
+  - PermissionBrowse, PermissionRead, PermissionWrite, PermissionCall
+  - PermissionReadRolePermissions, PermissionWriteRolePermissions
+  - PermissionWriteAttribute, PermissionReadHistory
+- If no Role.role file exists, only the default "Everyone" role is created

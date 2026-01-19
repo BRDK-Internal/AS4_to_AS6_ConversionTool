@@ -922,6 +922,9 @@ class AS4Converter {
             // Auto-apply mappView configuration updates (startup user to anonymous)
             this.autoApplyMappViewConfigConversion();
             
+            // Auto-remove deprecated function blocks (MpAlarmXAcknowledgeAll, etc.)
+            this.autoApplyDeprecatedFunctionBlockRemoval();
+            
             // Update UI
             this.displayAnalysisResults();
             this.switchTab('analysis');
@@ -2459,14 +2462,15 @@ class AS4Converter {
             });
             changes.push('Created UaCsConfig.uacfg');
             
-            // Create UaDvConfig.uadcfg
+            // Create UaDvConfig.uadcfg with roles from Role.role file
             const uaDvConfigPath = opcuaCsPath + '/UaDvConfig.uadcfg';
+            const roles = this.extractRolesFromProject();
             this.projectFiles.set(uaDvConfigPath, {
-                content: this.getUaDvConfigTemplate(),
+                content: this.getUaDvConfigTemplateWithRoles(roles),
                 isBinary: false,
                 type: 'xml'
             });
-            changes.push('Created UaDvConfig.uadcfg');
+            changes.push(`Created UaDvConfig.uadcfg with ${roles.length} roles`);
             
             // Update parent Connectivity Package.pkg to reference OpcUaCs instead of OpcUA
             const connectivityPkgPath = folderBase + 'Package.pkg';
@@ -2669,6 +2673,117 @@ class AS4Converter {
     </Group>
   </Element>
 </Configuration>`;
+    }
+
+    /**
+     * Extract roles from Role.role files in the project
+     * Returns an array of { id, name, description } objects
+     */
+    extractRolesFromProject() {
+        const roles = [];
+        
+        // Find Role.role files in the project
+        this.projectFiles.forEach((file, path) => {
+            if (path.toLowerCase().endsWith('.role') && typeof file.content === 'string') {
+                console.log(`Extracting roles from: ${path}`);
+                
+                // Parse XML to extract roles
+                // Format: <Element ID="RoleName" Type="Role">
+                //           <Property ID="RoleID" Value="1" />
+                //           <Property ID="Description" Value="..." />
+                //         </Element>
+                const elementPattern = /<Element\s+ID="([^"]+)"\s+Type="Role"[^>]*>([\s\S]*?)<\/Element>/gi;
+                let match;
+                
+                while ((match = elementPattern.exec(file.content)) !== null) {
+                    const roleName = match[1];
+                    const elementContent = match[2];
+                    
+                    // Extract RoleID
+                    const roleIdMatch = elementContent.match(/<Property\s+ID="RoleID"\s+Value="(\d+)"/i);
+                    const roleId = roleIdMatch ? parseInt(roleIdMatch[1]) : roles.length + 1;
+                    
+                    // Extract Description
+                    const descMatch = elementContent.match(/<Property\s+ID="Description"\s+Value="([^"]*)"/i);
+                    const description = descMatch ? descMatch[1] : '';
+                    
+                    roles.push({
+                        id: roleId,
+                        name: roleName,
+                        description: description
+                    });
+                    
+                    console.log(`  Found role: ${roleName} (ID: ${roleId})`);
+                }
+            }
+        });
+        
+        // Sort by role ID
+        roles.sort((a, b) => a.id - b.id);
+        
+        // If no roles found, return default "Everyone" role
+        if (roles.length === 0) {
+            console.log('No Role.role file found, using default Everyone role');
+            roles.push({
+                id: 1,
+                name: 'Everyone',
+                description: 'Default role'
+            });
+        }
+        
+        console.log(`Extracted ${roles.length} roles for OPC UA configuration`);
+        return roles;
+    }
+
+    /**
+     * Generate UaDvConfig.uadcfg content with roles from the project
+     * All permissions are enabled for all roles
+     */
+    getUaDvConfigTemplateWithRoles(roles) {
+        // Generate role permission groups
+        const roleGroups = roles.map((role, index) => {
+            return `      <Group ID="Role [${index + 1}]">
+        <Property ID="Name" Value="${this.escapeXmlAttribute(role.name)}" />
+        <Group ID="RolePermissions">
+          <Property ID="PermissionBrowse" Value="1" />
+          <Property ID="PermissionRead" Value="1" />
+          <Property ID="PermissionWrite" Value="1" />
+          <Property ID="PermissionCall" Value="1" />
+          <Property ID="PermissionReadRolePermissions" Value="1" />
+          <Property ID="PermissionWriteRolePermissions" Value="1" />
+          <Property ID="PermissionWriteAttribute" Value="1" />
+          <Property ID="PermissionReadHistory" Value="1" />
+        </Group>
+      </Group>`;
+        }).join('\n');
+
+        return `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio FileVersion="4.9"?>
+<Configuration>
+  <Element ID="DefaultViewConfiguration" Type="uadcfg">
+    <Group ID="InformationModels">
+      <Property ID="ComplexTypeFacet" Value="0" />
+      <Property ID="ExportTypeInformation" Value="0" />
+      <Property ID="DedicatedTypeDefinitionsForStructures" Value="0" />
+    </Group>
+    <Group ID="DefaultRolePermissions">
+${roleGroups}
+    </Group>
+  </Element>
+</Configuration>`;
+    }
+
+    /**
+     * Escape special characters for XML attribute values
+     */
+    escapeXmlAttribute(str) {
+        if (!str) return '';
+        return str
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
     }
 
     /**
@@ -3594,6 +3709,163 @@ ${mappingGroups}
         if (updatedCount > 0) {
             console.log(`MappView configuration updated for ${updatedCount} file(s)`);
         }
+    }
+
+    /**
+     * Auto-remove deprecated function blocks that are not supported in AS6
+     * 
+     * This method:
+     * 1. Removes function block instances from .var and .typ files
+     * 2. Comments out usages in source code files (.st, .c, etc.)
+     * 
+     * Function blocks handled:
+     * - MpAlarmXAcknowledgeAll (not supported in AS6)
+     */
+    autoApplyDeprecatedFunctionBlockRemoval() {
+        console.log('Removing deprecated function blocks...');
+        
+        const deprecatedFBs = DeprecationDatabase.deprecatedFunctionBlocks || [];
+        if (deprecatedFBs.length === 0) {
+            console.log('No deprecated function blocks defined');
+            return;
+        }
+        
+        let removedInstances = 0;
+        let commentedUsages = 0;
+        const instanceNames = new Set(); // Track instance names for usage detection
+        
+        // Step 1: Find and collect all instance names from .var and .typ files
+        deprecatedFBs.forEach(fb => {
+            if (!fb.autoRemove) return;
+            
+            const fbName = fb.name;
+            const fbPattern = new RegExp(`^\\s*(\\w+)\\s*:\\s*${this.escapeRegex(fbName)}\\s*;?\\s*$`, 'gm');
+            
+            this.projectFiles.forEach((file, filePath) => {
+                if (file.isBinary) return;
+                
+                const ext = filePath.toLowerCase().split('.').pop();
+                if (!['var', 'typ'].includes(ext)) return;
+                
+                let content = file.content;
+                let match;
+                
+                // Find all instance declarations
+                while ((match = fbPattern.exec(content)) !== null) {
+                    const instanceName = match[1];
+                    instanceNames.add(instanceName);
+                    console.log(`Found deprecated FB instance: ${instanceName} : ${fbName} in ${filePath}`);
+                }
+            });
+        });
+        
+        console.log(`Found ${instanceNames.size} deprecated function block instances to process`);
+        
+        // Step 2: Remove declarations from .var and .typ files
+        deprecatedFBs.forEach(fb => {
+            if (!fb.autoRemove) return;
+            
+            const fbName = fb.name;
+            // Pattern to match: instanceName : FunctionBlockName; (with optional whitespace and comments)
+            const declarationPattern = new RegExp(`^\\s*\\w+\\s*:\\s*${this.escapeRegex(fbName)}\\s*;?\\s*(?:\\/\\/.*)?$`, 'gm');
+            
+            this.projectFiles.forEach((file, filePath) => {
+                if (file.isBinary) return;
+                
+                const ext = filePath.toLowerCase().split('.').pop();
+                if (!['var', 'typ'].includes(ext)) return;
+                
+                let content = file.content;
+                const originalContent = content;
+                
+                // Remove the declaration lines
+                content = content.replace(declarationPattern, (match) => {
+                    removedInstances++;
+                    console.log(`Removing declaration from ${filePath}: ${match.trim()}`);
+                    return `(* REMOVED - AS6 unsupported: ${match.trim()} *)`;
+                });
+                
+                if (content !== originalContent) {
+                    file.content = content;
+                    
+                    this.analysisResults.push({
+                        type: 'deprecated_function_block',
+                        severity: 'warning',
+                        category: 'function_block',
+                        name: `Removed ${fbName} declaration`,
+                        description: `Removed deprecated function block ${fbName} declaration (not supported in AS6)`,
+                        file: filePath,
+                        autoFixed: true,
+                        notes: fb.notes,
+                        details: [`Original declarations replaced with comments for manual review`]
+                    });
+                }
+            });
+        });
+        
+        // Step 3: Comment out usages in source code files
+        if (instanceNames.size > 0) {
+            this.projectFiles.forEach((file, filePath) => {
+                if (file.isBinary) return;
+                
+                const ext = filePath.toLowerCase().split('.').pop();
+                // Only process source code files
+                if (!['st', 'c', 'cpp', 'h', 'fun', 'prg'].includes(ext)) return;
+                
+                let content = file.content;
+                let modified = false;
+                const lines = content.split('\n');
+                const newLines = [];
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    let shouldComment = false;
+                    let matchedInstance = null;
+                    
+                    // Check if this line contains any of the deprecated instances
+                    for (const instanceName of instanceNames) {
+                        // Pattern to match instance usage: instanceName.xxx or instanceName(
+                        // Also match assignment to instance parameters: instanceName.param := 
+                        const usagePattern = new RegExp(`\\b${this.escapeRegex(instanceName)}\\s*[.(]`, 'i');
+                        const assignPattern = new RegExp(`\\b${this.escapeRegex(instanceName)}\\b`, 'i');
+                        
+                        if (usagePattern.test(line) || assignPattern.test(line)) {
+                            shouldComment = true;
+                            matchedInstance = instanceName;
+                            break;
+                        }
+                    }
+                    
+                    if (shouldComment && !line.trim().startsWith('//') && !line.trim().startsWith('(*')) {
+                        // Comment out the line with explanation
+                        newLines.push(`(* AS6-REMOVED: ${line} *) // TODO: MpAlarmXAcknowledgeAll not supported in AS6 - requires manual reimplementation`);
+                        modified = true;
+                        commentedUsages++;
+                        console.log(`Commented out usage in ${filePath}: ${line.trim()}`);
+                    } else {
+                        newLines.push(line);
+                    }
+                }
+                
+                if (modified) {
+                    file.content = newLines.join('\n');
+                    
+                    this.analysisResults.push({
+                        type: 'deprecated_function_block',
+                        severity: 'warning',
+                        category: 'function_block',
+                        name: 'Commented deprecated FB usage',
+                        description: 'Commented out deprecated function block usage for manual review',
+                        file: filePath,
+                        autoFixed: true,
+                        notes: 'Lines containing deprecated function block instances have been commented out. Manual reimplementation required.',
+                        details: [`Search for "AS6-REMOVED" or "TODO: MpAlarmXAcknowledgeAll" in the file`]
+                    });
+                }
+            });
+        }
+        
+        console.log(`Deprecated function block removal complete: ${removedInstances} declarations removed, ${commentedUsages} usages commented out`);
     }
 
     /**
@@ -4548,6 +4820,7 @@ ${mappingGroups}
             function_block: '🧩',
             deprecated_function_call: '🔄',
             deprecated_constant: '🔢',
+            deprecated_function_block: '🚫',
             hardware: '🔌',
             project: '📁',
             technology_package: '📦',
@@ -4570,6 +4843,7 @@ ${mappingGroups}
             function_block: 'Function Blocks',
             deprecated_function_call: 'Deprecated Function Calls',
             deprecated_constant: 'Deprecated Constants',
+            deprecated_function_block: 'Removed Function Blocks',
             hardware: 'Hardware Modules',
             project: 'Project Format',
             technology_package: 'Technology Packages',

@@ -504,6 +504,23 @@ const DeprecationDatabase = {
     ],
 
     // ==========================================
+    // DEPRECATED FUNCTION BLOCKS (AS6 unsupported)
+    // ==========================================
+    deprecatedFunctionBlocks: [
+        {
+            id: "fb_mpalarmxacknowledgeall",
+            name: "MpAlarmXAcknowledgeAll",
+            library: "MpAlarmX",
+            severity: "error",
+            description: "MpAlarmXAcknowledgeAll function block is not supported in AS6",
+            replacement: null,
+            notes: "This function block must be manually reimplemented. Instances will be removed from .var/.typ files and usages will be commented out in source files for manual review.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        }
+    ],
+
+    // ==========================================
     // DEPRECATED LIBRARIES
     // ==========================================
     libraries: [
