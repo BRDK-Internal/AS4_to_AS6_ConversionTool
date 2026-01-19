@@ -1235,6 +1235,13 @@ body {
     z-index: 2;
 }
 
+.progress-details {
+    margin-top: 15px;
+    font-size: 0.85em;
+    color: var(--text-light);
+    text-align: center;
+}
+
 /* Technology Package Dialog */
 .tech-package-dialog {
     max-width: 600px;

@@ -440,6 +440,21 @@ class AS4Converter {
         try {
             this.projectFiles.clear();
             
+            // Show upload progress dialog
+            const progressDialog = document.getElementById('uploadProgressDialog');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressPercent = document.getElementById('uploadProgressPercent');
+            const progressMessage = document.getElementById('uploadProgressMessage');
+            const progressDetails = document.getElementById('uploadProgressDetails');
+            
+            if (progressDialog) {
+                progressDialog.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressPercent.textContent = '0%';
+                progressMessage.textContent = 'Filtering relevant files...';
+                progressDetails.textContent = '';
+            }
+            
             // All supported B&R Automation Studio file extensions
             const relevantExtensions = [
                 // Code files
@@ -509,6 +524,12 @@ class AS4Converter {
                 return relevantExtensions.includes(ext);
             });
             
+            // Update progress after filtering
+            if (progressDialog) {
+                progressMessage.textContent = `Loading ${relevantFiles.length} project files...`;
+                progressDetails.textContent = `Filtered from ${files.length} total files`;
+            }
+            
             // Debug: Log filtered binary files
             const filteredBinaryFiles = relevantFiles.filter(f => {
                 const ext = this.getFileExtension(f.name);
@@ -517,7 +538,11 @@ class AS4Converter {
             console.log(`Binary files after filtering (processFiles): ${filteredBinaryFiles.length}`);
             filteredBinaryFiles.slice(0, 10).forEach(f => console.log(`  - ${f.webkitRelativePath || f.name}`));
             
-            // Process files with error handling
+            // Process files with error handling and progress updates
+            const totalFiles = relevantFiles.length;
+            let processedCount = 0;
+            let lastProgressUpdate = 0;
+            
             for (const file of relevantFiles) {
                 try {
                     const content = await this.readFileContent(file);
@@ -544,13 +569,44 @@ class AS4Converter {
                         extension: ext,
                         isBinary: isBinary
                     });
+                    
+                    // Update progress (throttled to avoid UI lag)
+                    processedCount++;
+                    const currentProgress = Math.round((processedCount / totalFiles) * 100);
+                    if (progressDialog && currentProgress > lastProgressUpdate) {
+                        lastProgressUpdate = currentProgress;
+                        progressBar.style.width = `${currentProgress}%`;
+                        progressPercent.textContent = `${currentProgress}%`;
+                        progressDetails.textContent = `${processedCount} / ${totalFiles} files loaded`;
+                        // Yield to UI thread every 5%
+                        if (currentProgress % 5 === 0) {
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
+                    }
                 } catch (err) {
                     console.warn(`Skipping file ${file.name}:`, err);
+                    processedCount++;
                 }
+            }
+            
+            // Hide upload progress dialog
+            if (progressDialog) {
+                progressBar.style.width = '100%';
+                progressPercent.textContent = '100%';
+                progressMessage.textContent = 'Complete!';
+                progressDetails.textContent = `Loaded ${this.projectFiles.size} files`;
+                // Brief delay before hiding so user sees completion
+                await new Promise(resolve => setTimeout(resolve, 300));
+                progressDialog.classList.add('hidden');
             }
             
             this.updateProjectInfo();
         } catch (error) {
+            // Hide progress dialog on error
+            const progressDialog = document.getElementById('uploadProgressDialog');
+            if (progressDialog) {
+                progressDialog.classList.add('hidden');
+            }
             console.error('Error processing files:', error);
             alert('Error processing files: ' + error.message);
         }
