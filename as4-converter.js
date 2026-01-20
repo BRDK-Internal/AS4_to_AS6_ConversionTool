@@ -1302,6 +1302,9 @@ class AS4Converter {
             // Auto-remove deprecated function blocks (MpAlarmXAcknowledgeAll, etc.)
             this.autoApplyDeprecatedFunctionBlockRemoval();
             
+            // Auto-remove SafetyRelease from .pkg files (not supported in AS6)
+            this.autoRemoveSafetyRelease();
+            
             // Update UI
             this.displayAnalysisResults();
             this.switchTab('analysis');
@@ -4243,6 +4246,54 @@ ${mappingGroups}
         }
         
         console.log(`Deprecated function block removal complete: ${removedInstances} declarations removed, ${commentedUsages} usages commented out`);
+    }
+
+    /**
+     * Remove SafetyRelease attribute from .pkg files
+     * SafetyRelease is not supported in AS6 and must be removed from cpu.pkg files
+     */
+    autoRemoveSafetyRelease() {
+        console.log('Removing SafetyRelease from .pkg files...');
+        
+        let removedCount = 0;
+        
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            
+            const ext = filePath.toLowerCase().split('.').pop();
+            if (ext !== 'pkg') return;
+            
+            const content = file.content;
+            const originalContent = content;
+            
+            // Pattern to match: <Safety SafetyRelease="x.xx" />
+            const safetyReleasePattern = /<Safety\s+SafetyRelease="[^"]+"\s*\/>/gi;
+            
+            if (safetyReleasePattern.test(content)) {
+                // Remove the SafetyRelease line
+                const newContent = content.replace(safetyReleasePattern, (match) => {
+                    removedCount++;
+                    console.log(`Removing SafetyRelease from ${filePath}: ${match.trim()}`);
+                    return `<!-- AS6: SafetyRelease not supported - removed: ${match.trim()} -->`;
+                });
+                
+                file.content = newContent;
+                
+                this.analysisResults.push({
+                    type: 'safety_config',
+                    severity: 'info',
+                    category: 'configuration',
+                    name: 'SafetyRelease removed',
+                    description: 'Removed SafetyRelease attribute (not supported in AS6)',
+                    file: filePath,
+                    autoFixed: true,
+                    notes: 'SafetyRelease is no longer supported in AS6 and has been removed from package configuration.',
+                    details: ['The line has been replaced with an XML comment for reference']
+                });
+            }
+        });
+        
+        console.log(`SafetyRelease removal complete: ${removedCount} entries removed`);
     }
 
     /**

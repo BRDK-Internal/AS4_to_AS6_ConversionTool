@@ -89,6 +89,7 @@ const DeprecationDatabase = {
                 // Note: SfDomain is a library, not a subVersion
             },
             'mappView': { as4Version: '5.24.1', as6Version: '6.2.0', required: false },
+            'mappVision': { as4Version: '5.30.3307', as6Version: '6.0.0', required: false },
             'mappCockpit': { as4Version: '5.24.2', as6Version: '6.2.1', required: false },
             'OpcUaCs': { as4Version: null, as6Version: '6.0.0', newInAS6: true },
             'OpcUaFx': { as4Version: null, as6Version: '6.1.0', newInAS6: true, subVersions: { FxPtpB: '6.1.0', FxPubSubB: '6.1.0', PubSub: '1.3.0' } }
@@ -283,6 +284,10 @@ const DeprecationDatabase = {
             'MpServer': { techPackage: 'mappServices', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
             
             // mappView (6.0.0) - Visualization
+            
+            // mappVision (6.0.0) - Vision system
+            'ViAccess': { techPackage: 'mappVision', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            'ViBase': { techPackage: 'mappVision', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             
             // mappMotion (6.0.0) - Motion control
             'MpAxis': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
