@@ -472,9 +472,219 @@ class AS4Converter {
     }
 
     async handleZipUpload(file) {
-        // Note: Full ZIP support would require a library like JSZip
-        // For now, show a message
-        alert('ZIP upload requires the JSZip library. Please use folder selection instead.');
+        // Check if JSZip is available
+        if (typeof JSZip === 'undefined') {
+            alert('JSZip library not loaded. Please check your internet connection and refresh the page.');
+            return;
+        }
+
+        try {
+            // Show upload progress dialog
+            const progressDialog = document.getElementById('uploadProgressDialog');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const progressPercent = document.getElementById('uploadProgressPercent');
+            const progressMessage = document.getElementById('uploadProgressMessage');
+            const progressDetails = document.getElementById('uploadProgressDetails');
+            
+            if (progressDialog) {
+                progressDialog.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                progressPercent.textContent = '0%';
+                progressMessage.textContent = 'Extracting ZIP archive...';
+                progressDetails.textContent = '';
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            }
+
+            // Load the ZIP file
+            const zip = await JSZip.loadAsync(file);
+            
+            // Update progress
+            if (progressDialog) {
+                progressMessage.textContent = 'Processing files from archive...';
+                progressBar.style.width = '30%';
+                progressPercent.textContent = '30%';
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+
+            // Extract all files
+            const files = [];
+            const fileEntries = Object.keys(zip.files);
+            let processedCount = 0;
+
+            for (const relativePath of fileEntries) {
+                const zipEntry = zip.files[relativePath];
+                
+                // Skip directories
+                if (zipEntry.dir) {
+                    continue;
+                }
+
+                try {
+                    // Read file content
+                    const ext = this.getFileExtension(zipEntry.name);
+                    const isBinary = AS4Converter.BINARY_EXTENSIONS.includes(ext);
+                    
+                    let content;
+                    if (isBinary) {
+                        content = await zipEntry.async('base64');
+                    } else {
+                        content = await zipEntry.async('text');
+                    }
+
+                    // Create a File-like object
+                    files.push({
+                        name: zipEntry.name.split('/').pop(),
+                        relativePath: relativePath,
+                        webkitRelativePath: relativePath,
+                        content: content,
+                        isBinary: isBinary
+                    });
+
+                    // Update progress
+                    processedCount++;
+                    const percent = 30 + Math.round((processedCount / fileEntries.length) * 40);
+                    if (progressDialog) {
+                        progressBar.style.width = `${percent}%`;
+                        progressPercent.textContent = `${percent}%`;
+                        progressDetails.textContent = `Extracted ${processedCount} of ${fileEntries.length} files`;
+                        
+                        if (processedCount % 50 === 0) {
+                            await new Promise(resolve => setTimeout(resolve, 0));
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`Failed to extract ${relativePath}:`, err);
+                }
+            }
+
+            // Update progress
+            if (progressDialog) {
+                progressMessage.textContent = 'Processing extracted files...';
+                progressBar.style.width = '70%';
+                progressPercent.textContent = '70%';
+                await new Promise(resolve => requestAnimationFrame(resolve));
+            }
+
+            // Process the extracted files using existing logic
+            await this.processExtractedFiles(files, progressDialog, progressBar, progressPercent, progressMessage, progressDetails);
+
+        } catch (error) {
+            console.error('Error processing ZIP file:', error);
+            alert('Error processing ZIP file: ' + error.message);
+            
+            // Hide progress dialog
+            const progressDialog = document.getElementById('uploadProgressDialog');
+            if (progressDialog) {
+                progressDialog.classList.add('hidden');
+            }
+        }
+    }
+
+    async processExtractedFiles(files, progressDialog, progressBar, progressPercent, progressMessage, progressDetails) {
+        this.projectFiles.clear();
+
+        // All supported B&R Automation Studio file extensions (same filter as processFiles)
+        const relevantExtensions = [
+            '.st', '.fun', '.typ', '.var', '.prg', '.svar',
+            '.hw', '.hwl', '.sw', '.per',
+            '.xml', '.pkg', '.apj',
+            '.ax', '.apt', '.ncm', '.ncc', '.dob',
+            '.tmx', '.textconfig', '.units',
+            '.iom', '.vvm',
+            '.lby', '.br', '.a', '.o',
+            '.c', '.h',
+            '.content', '.eventbinding', '.binding', '.action',
+            '.page', '.layout', '.dialog', '.theme', '.styles',
+            '.vis', '.mappviewcfg', '.widgetlibrary', '.snippet',
+            '.numpad', '.compoundwidget', '.stylesset',
+            '.uaserver', '.uad',
+            '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
+            '.mpalarmxlist', '.mpalarmxcategory', '.mpalarmxquery',
+            '.mpcomgroup', '.mpfilemanagerui',
+            '.role', '.user', '.firewallrules',
+            '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
+            '.ett', '.language', '.sfapp', '.swt',
+            '.jpg', '.svg', '.png', '.gif', '.bmp', '.ico',
+            '.ps1', '.bat', '.cmd', '.gitignore',
+            '.md', '.doc', '.txt'
+        ];
+
+        const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
+
+        const relevantFiles = files.filter(file => {
+            const filePath = file.relativePath || file.webkitRelativePath || file.name;
+            const pathParts = filePath.split(/[/\\]/);
+            
+            if (pathParts.some(part => excludedFolders.includes(part))) {
+                return false;
+            }
+            
+            const ext = this.getFileExtension(file.name);
+            return relevantExtensions.includes(ext);
+        });
+
+        if (progressDialog) {
+            progressMessage.textContent = `Loading ${relevantFiles.length} project files...`;
+            progressDetails.textContent = `Filtered from ${files.length} total files`;
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
+
+        // Process files
+        const totalFiles = relevantFiles.length;
+        let loadedCount = 0;
+
+        for (const file of relevantFiles) {
+            try {
+                const ext = this.getFileExtension(file.name);
+                const type = this.getFileType(ext);
+                const isBinary = file.isBinary;
+
+                // Detect AS version from .apj file
+                if (ext === '.apj' && !isBinary) {
+                    const versionInfo = DeprecationDatabase.detectASVersion(file.content);
+                    if (versionInfo) {
+                        this.projectASVersion = versionInfo;
+                        this.isAS6Project = versionInfo.major >= 6;
+                    }
+                }
+
+                this.projectFiles.set(file.relativePath || file.webkitRelativePath || file.name, {
+                    content: file.content,
+                    type,
+                    name: file.name,
+                    extension: ext,
+                    isBinary: isBinary
+                });
+
+                loadedCount++;
+                const percent = 70 + Math.round((loadedCount / totalFiles) * 30);
+                if (progressDialog) {
+                    progressBar.style.width = `${percent}%`;
+                    progressPercent.textContent = `${percent}%`;
+                    progressDetails.textContent = `${loadedCount} of ${totalFiles} files loaded`;
+                    
+                    if (loadedCount % 25 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                }
+            } catch (err) {
+                console.warn(`Failed to process file: ${file.name}`, err);
+            }
+        }
+
+        // Complete
+        if (progressDialog) {
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressMessage.textContent = 'Upload complete!';
+            progressDetails.textContent = `${totalFiles} files loaded successfully`;
+            
+            setTimeout(() => {
+                progressDialog.classList.add('hidden');
+            }, 300);
+        }
+
+        this.updateProjectInfo();
     }
 
     async processFiles(files) {
