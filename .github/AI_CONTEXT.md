@@ -201,6 +201,19 @@ Technology packages are in:
 8. Added `wrapWith` support for function mappings (e.g., strlen → UDINT_TO_UINT(brsstrlen(...)))
 9. Added deprecated function block removal (MpAlarmXAcknowledgeAll - removes from .var/.typ, comments out usages)
 10. Added OPC UA role configuration - extracts roles from Role.role files and adds them to UaDvConfig.uadcfg with all permissions enabled
+11. Added mappCockpit technology package support (version 5.24.2 → 6.2.1) with CoTrace library
+
+## Technology Packages Supported
+
+| AS4 Package | AS6 Version | Libraries |
+|-------------|-------------|-----------|
+| Acp10Arnc0 | 6.2.0 | Acp10_MC, Acp10man, Acp10par, Acp10sim, Acp10sdc, NcGlobal |
+| mapp → mappServices | 6.2.0 | MpAlarmX, MpAudit, MpBackup, MpCom, MpData, MpFile, MpRecipe, MpServer, etc. |
+| mappSafety | 6.2.0 | SfDomain |
+| mappView | 6.2.0 | (visualization) |
+| mappCockpit | 6.2.1 | CoTrace |
+| mappMotion | 6.0.0 | MpAxis, MpCnc, MpRobotics, McAcpAx, McAxis, McBase |
+| mappControl | 6.0.0 | MpTemp, MTData, MTBasics, MTFilter |
 
 ## OPC UA Role Configuration
 

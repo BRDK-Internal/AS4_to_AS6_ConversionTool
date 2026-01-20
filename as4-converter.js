@@ -308,6 +308,23 @@ class AS4Converter {
     async processFilesInBatches(files, batchSize = 20) {
         this.projectFiles.clear();
         
+        // Show upload progress dialog
+        const progressDialog = document.getElementById('uploadProgressDialog');
+        const progressBar = document.getElementById('uploadProgressBar');
+        const progressPercent = document.getElementById('uploadProgressPercent');
+        const progressMessage = document.getElementById('uploadProgressMessage');
+        const progressDetails = document.getElementById('uploadProgressDetails');
+        
+        if (progressDialog) {
+            progressDialog.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressMessage.textContent = 'Filtering relevant files...';
+            progressDetails.textContent = '';
+            // Force browser to paint the dialog before processing
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        }
+        
         // All supported B&R Automation Studio file extensions
         const relevantExtensions = [
             // Code files
@@ -383,10 +400,16 @@ class AS4Converter {
         console.log(`Binary files after filtering: ${filteredBinaryFiles.length}`);
         filteredBinaryFiles.slice(0, 10).forEach(f => console.log(`  - ${f.webkitRelativePath || f.name}`));
         
-        // Show progress
-        this.elements.btnScan.textContent = `Loading... 0/${relevantFiles.length}`;
+        // Update progress dialog with file count
+        const totalFiles = relevantFiles.length;
+        if (progressDialog) {
+            progressMessage.textContent = `Loading ${totalFiles} project files...`;
+            // Yield to let browser paint updated message
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
         this.elements.btnScan.disabled = true;
         
+        let loadedCount = 0;
         for (let i = 0; i < relevantFiles.length; i += batchSize) {
             const batch = relevantFiles.slice(i, i + batchSize);
             
@@ -421,9 +444,27 @@ class AS4Converter {
                 }
             }));
             
-            // Update progress and yield to UI
-            this.elements.btnScan.textContent = `Loading... ${Math.min(i + batchSize, relevantFiles.length)}/${relevantFiles.length}`;
+            // Update progress dialog and yield to UI
+            loadedCount = Math.min(i + batchSize, totalFiles);
+            const percent = Math.round((loadedCount / totalFiles) * 100);
+            if (progressDialog) {
+                progressBar.style.width = `${percent}%`;
+                progressPercent.textContent = `${percent}%`;
+                progressDetails.textContent = `${loadedCount} of ${totalFiles} files loaded`;
+            }
             await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // Complete - show 100% briefly then hide
+        if (progressDialog) {
+            progressBar.style.width = '100%';
+            progressPercent.textContent = '100%';
+            progressMessage.textContent = 'Upload complete!';
+            progressDetails.textContent = `${totalFiles} files loaded successfully`;
+            
+            setTimeout(() => {
+                progressDialog.classList.add('hidden');
+            }, 300);
         }
         
         this.elements.btnScan.textContent = '🔍 Scan for Deprecations';
@@ -453,6 +494,8 @@ class AS4Converter {
                 progressPercent.textContent = '0%';
                 progressMessage.textContent = 'Filtering relevant files...';
                 progressDetails.textContent = '';
+                // Force browser to paint the dialog before processing
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             }
             
             // All supported B&R Automation Studio file extensions
@@ -528,6 +571,8 @@ class AS4Converter {
             if (progressDialog) {
                 progressMessage.textContent = `Loading ${relevantFiles.length} project files...`;
                 progressDetails.textContent = `Filtered from ${files.length} total files`;
+                // Yield to let browser paint updated message
+                await new Promise(resolve => requestAnimationFrame(resolve));
             }
             
             // Debug: Log filtered binary files
@@ -4915,6 +4960,18 @@ ${mappingGroups}
     }
 
     resetAnalysisUI() {
+        // Remove blocking error banner if present
+        const blockingBanner = document.getElementById('blockingErrorBanner');
+        if (blockingBanner) {
+            blockingBanner.remove();
+        }
+        
+        // Re-enable download button
+        if (this.elements.btnDownload) {
+            this.elements.btnDownload.disabled = true; // Will be enabled when there are results
+            this.elements.btnDownload.title = '';
+        }
+        
         this.elements.analysisEmpty.classList.remove('hidden');
         this.elements.analysisResults.classList.add('hidden');
         this.elements.analysisEmpty.innerHTML = `

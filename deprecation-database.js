@@ -89,6 +89,7 @@ const DeprecationDatabase = {
                 // Note: SfDomain is a library, not a subVersion
             },
             'mappView': { as4Version: '5.24.1', as6Version: '6.2.0', required: false },
+            'mappCockpit': { as4Version: '5.24.2', as6Version: '6.2.1', required: false },
             'OpcUaCs': { as4Version: null, as6Version: '6.0.0', newInAS6: true },
             'OpcUaFx': { as4Version: null, as6Version: '6.1.0', newInAS6: true, subVersions: { FxPtpB: '6.1.0', FxPubSubB: '6.1.0', PubSub: '1.3.0' } }
         },
@@ -171,8 +172,8 @@ const DeprecationDatabase = {
             // mappControl (6.0.0) - Advanced control
             'MpTemp': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             
-            // mappCockpit (6.0.0) - Diagnostics
-            'CoTrace': { techPackage: 'mappCockpit', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            // mappCockpit (6.2.1) - Diagnostics
+            'CoTrace': { techPackage: 'mappCockpit', as6Version: '6.2.1', as6LibVersion: '6.2.1' },
             
             // Acp10Arnc0 (6.2.0) - ACOPOS motion
             'Acp10_MC': { techPackage: 'Acp10Arnc0', as6Version: '6.2.0', as6LibVersion: '6.2.0' },
@@ -1609,6 +1610,40 @@ const DeprecationDatabase = {
                 }
             }
         });
+        
+        // Add technology packages if any of their libraries are used (even if not in AS4)
+        if (usedLibraries && usedLibraries.length > 0) {
+            const libMapping = this.as6Format.libraryMapping;
+            
+            usedLibraries.forEach(libName => {
+                const mapping = libMapping[libName];
+                if (mapping && mapping.techPackage) {
+                    const techPkgName = mapping.techPackage;
+                    const exists = as6Packages.some(p => p.name === techPkgName);
+                    
+                    if (!exists) {
+                        const ref = tpRef[techPkgName];
+                        if (ref) {
+                            // Collect all libraries from this tech package that are used
+                            const packageLibs = {};
+                            usedLibraries.forEach(ln => {
+                                const lm = libMapping[ln];
+                                if (lm && lm.techPackage === techPkgName) {
+                                    packageLibs[ln] = lm.as6LibVersion || ref.as6Version;
+                                }
+                            });
+                            
+                            as6Packages.push({
+                                name: techPkgName,
+                                version: ref.as6Version,
+                                subVersions: Object.keys(packageLibs).length > 0 ? packageLibs : null,
+                                note: `Added for library: ${libName}`
+                            });
+                        }
+                    }
+                }
+            });
+        }
         
         return as6Packages;
     },
