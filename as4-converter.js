@@ -4526,6 +4526,26 @@ ${mappingGroups}
             }
         });
         
+        // Remove all files from the MpWebXs library folder
+        const mpwebxsLibraryFiles = [];
+        this.projectFiles.forEach((file, filePath) => {
+            const pathLower = filePath.toLowerCase();
+            // Match paths like ".../Libraries/MpWebXs/..." or "Libraries\MpWebXs\..."
+            if (pathLower.includes('/libraries/mpwebxs/') || pathLower.includes('\\libraries\\mpwebxs\\') ||
+                pathLower.includes('/libraries/mpwebxs\\') || pathLower.includes('\\libraries\\mpwebxs/')) {
+                mpwebxsLibraryFiles.push(filePath);
+            }
+        });
+        
+        if (mpwebxsLibraryFiles.length > 0) {
+            console.log(`Found ${mpwebxsLibraryFiles.length} files in MpWebXs library folder to remove`);
+            mpwebxsLibraryFiles.forEach(filePath => {
+                this.projectFiles.delete(filePath);
+                console.log(`Removed MpWebXs library file: ${filePath}`);
+            });
+            removedFiles.push(...mpwebxsLibraryFiles.map(f => f.split(/[/\\]/).pop())); // Just file names for summary
+        }
+        
         // Add summary finding if anything was removed
         if (removedLibraryCount > 0 || removedConfigCount > 0 || removedFiles.length > 0) {
             this.addFinding({
@@ -4714,6 +4734,38 @@ ${mappingGroups}
             const libIndex = pathParts.findIndex(p => p.toLowerCase() === 'libraries');
             if (libIndex >= 0 && libIndex < pathParts.length - 1) {
                 const libName = pathParts[libIndex + 1];
+                detectedLibraries.add(libName);
+            }
+        });
+        
+        // Method 4: Scan Package.pkg files for library references
+        this.projectFiles.forEach((file, path) => {
+            const pathLower = path.toLowerCase();
+            if (!pathLower.endsWith('package.pkg')) return;
+            if (typeof file.content !== 'string') return;
+            
+            // Match: <Object Type="Library">LibName</Object> or <Object Type="Library" Description="...">LibName</Object>
+            const libPattern = /<Object\s+[^>]*Type\s*=\s*["']Library["'][^>]*>\s*([^<]+?)\s*<\/Object>/gi;
+            let match;
+            while ((match = libPattern.exec(file.content)) !== null) {
+                const libName = match[1].trim();
+                if (libName && !libName.includes('<')) {
+                    detectedLibraries.add(libName);
+                }
+            }
+        });
+        
+        // Method 5: Scan .sw files for LibraryObject references
+        this.projectFiles.forEach((file, path) => {
+            const pathLower = path.toLowerCase();
+            if (!pathLower.endsWith('.sw')) return;
+            if (typeof file.content !== 'string') return;
+            
+            // Match: <LibraryObject Name="LibName" ... />
+            const libPattern = /<LibraryObject\s+[^>]*Name\s*=\s*["']([^"']+)["']/gi;
+            let match;
+            while ((match = libPattern.exec(file.content)) !== null) {
+                const libName = match[1].trim();
                 detectedLibraries.add(libName);
             }
         });

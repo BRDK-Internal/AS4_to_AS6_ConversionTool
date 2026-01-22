@@ -297,8 +297,34 @@ const DeprecationDatabase = {
             'McAxis': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             'McBase': { techPackage: 'mappMotion', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
             
-            // mappControl (6.0.0) - Advanced control
-            'MpTemp': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            // mappControl (6.1.0) - Advanced control / Temperature / Hydraulics
+            // Mp* libraries (mapp control components)
+            'MpClamp': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpCorePull': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpEjector': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpHalfNut': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpHydAxis': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpHydPump': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpInject': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpInjUnit': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpMHeight': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpPump': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpRegMark': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpSafeGate': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpScale': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpTemp': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpTension': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MpTieBar': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            // MT* libraries (motion toolbox in mappControl)
+            'MTBasics': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTData': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTFilter': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTGntCrane': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTIdentify': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTLinAlg': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTLookUp': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTProfile': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
+            'MTSkew': { techPackage: 'mappControl', as6Version: '6.1.0', as6LibVersion: '6.1.0' },
             
             // mappCockpit (6.2.1) - Diagnostics
             'CoTrace': { techPackage: 'mappCockpit', as6Version: '6.2.1', as6LibVersion: '6.2.1' },
@@ -322,13 +348,9 @@ const DeprecationDatabase = {
             // 'SafeMOTION': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' }, // Not bundled
             // 'MpSafety': { techPackage: 'mappSafety', as6Version: '6.2.0', as6LibVersion: '6.2.0' }, // Not bundled
             
-            // MTTypes/MTData - Motion toolbox (specific versions in AS6)
+            // MTTypes - Motion toolbox types (specific version in AS6)
             'MTTypes': { source: 'Library_2', as6LibVersion: '6.0.0' },
-            'MTData': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MTBasics': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MTFilter': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MTLookUp': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
-            'MTProfile': { techPackage: 'mappControl', as6Version: '6.0.0', as6LibVersion: '6.0.0' },
+            // Note: MTAdvanced, MTSystem, MTTemp are in Library_2, not mappControl tech package
             'MTAdvanced': { source: 'Library_2', as6LibVersion: null },
             'MTSystem': { source: 'Library_2', as6LibVersion: null },
             'MTTemp': { source: 'Library_2', as6LibVersion: null },
