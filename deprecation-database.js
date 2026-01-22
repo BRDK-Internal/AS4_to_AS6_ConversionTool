@@ -351,6 +351,8 @@ const DeprecationDatabase = {
             
             // MTTypes - Motion toolbox types (specific version in AS6)
             'MTTypes': { source: 'Library_2', as6LibVersion: '6.0.0' },
+            // MTPrintHW - Printing hardware library (specific version in AS6)
+            'MTPrintHW': { source: 'Library_2', as6LibVersion: 'V6.0.0' },
             // Note: MTAdvanced, MTSystem, MTTemp are in Library_2, not mappControl tech package
             'MTAdvanced': { source: 'Library_2', as6LibVersion: null },
             'MTSystem': { source: 'Library_2', as6LibVersion: null },

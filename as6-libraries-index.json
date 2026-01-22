@@ -767,6 +767,17 @@
                                     "binary.lby",
                                     "SG4/AsTCP.h"
                                 ],
+                      "MTPrintHW":  [
+                                        "V6.0.0/binary.lby",
+                                        "V6.0.0/MTPrintHW.fun",
+                                        "V6.0.0/MTPrintHW.typ",
+                                        "V6.0.0/MTPrintHW.var",
+                                        "V6.0.0/SG4/MTPrintHW.h",
+                                        "V6.0.0/SG4/ARM/libMTPrintHW.a",
+                                        "V6.0.0/SG4/ARM/MTPrintHW.br",
+                                        "V6.0.0/SG4/IA32/libMTPrintHW.a",
+                                        "V6.0.0/SG4/IA32/MTPrintHW.br"
+                                    ],
                       "MTAdvanced":  [
                                          "V6.0.0/binary.lby",
                                          "V6.0.0/MTAdvanced.fun",

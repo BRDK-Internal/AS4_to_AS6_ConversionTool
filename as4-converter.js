@@ -335,6 +335,10 @@ class AS4Converter {
             '.xml', '.pkg', '.apj',
             // Motion/Axis
             '.ax', '.apt', '.ncm', '.ncc', '.dob', '.vax',
+            // mappView binding lists
+            '.bindinglist',
+            // mappView expressions
+            '.expression', '.expressiontype',
             // Localization
             '.tmx', '.textconfig', '.units',
             // I/O and mapping
@@ -389,7 +393,33 @@ class AS4Converter {
             '.exe', '.dll',                                       // Executables
             '.zip', '.rar', '.7z',                               // Archives
             '.bin', '.dat',                                       // Binary data files
-            '.csv', '.json'                                       // Data files
+            '.csv', '.json',                                      // Data files
+            // Alarm/Text configuration
+            '.alcfg', '.algrp', '.txtgrp',
+            // Bus Navigator
+            '.bnc', '.bns', '.set', '.sxostd', '.xostd',
+            // Safety Designer files (text-based)
+            '.cic', '.ciw', '.dip', '.dit', '.diw', '.gs', '.il', '.ioc', '.lci', '.ldi', '.off', '.pou', '.tdi', '.proj', '.plcproj',
+            // Data source/version
+            '.dso', '.cvinfo',
+            // Extension/config files
+            '.ext', '.cfg', '.inf', '.ini', '.dir',
+            // Additional text files
+            '.lst', '.mev', '.mrk', '.rej', '.resolve', '.txc', '.vcr', '.vcug', '.wwv',
+            // Web/script files
+            '.html', '.js', '.vbs', '.url',
+            // Graph files
+            '.graphml',
+            // Visual Components
+            '.vcp',
+            // Safety binary files (need to be copied as-is)
+            '.saf', '.sos', '.sim', '.st1', '.sto', '.pr2',
+            // Cross-reference files
+            '.crcl', '.ibs', '.lov', '.wwd',
+            // Source control
+            '.scc',
+            // Help cache
+            '.chw'
         ];
         // Folders to exclude (temp/build artifacts)
         const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
@@ -604,6 +634,7 @@ class AS4Converter {
             '.hw', '.hwl', '.sw', '.per',
             '.xml', '.pkg', '.apj',
             '.ax', '.apt', '.ncm', '.ncc', '.dob', '.vax',
+            '.bindinglist', '.expression', '.expressiontype',
             '.tmx', '.textconfig', '.units',
             '.iom', '.vvm',
             '.lby', '.br', '.a', '.o',
@@ -616,25 +647,38 @@ class AS4Converter {
             '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
             '.mpalarmxlist', '.mpalarmxcategory', '.mpalarmxquery',
             '.mpcomgroup', '.mpfilemanagerui',
-            '.mpwebxs', '.mpreportcore', '.mpaudittrail',  // mappServices additional
-            '.visionapplication', '.visioncomponent', '.vicfg',  // mappVision
-            '.dis',  // VC keyboards
-            '.role', '.user', '.firewallrules',
+            '.mpwebxs', '.mpreportcore', '.mpaudittrail',
+            '.visionapplication', '.visioncomponent', '.vicfg',
+            '.dis', '.role', '.user', '.firewallrules',
             '.dtm', '.dtmdre', '.dtmtre', '.dtmdri',
             '.ett', '.language', '.sfapp', '.swt',
             '.jpg', '.svg', '.png', '.gif', '.bmp', '.ico',
             '.ps1', '.bat', '.cmd', '.gitignore',
             '.md', '.doc', '.txt',
-            // Documents folder files (must be copied unchanged)
-            '.pdf', '.chm', '.hlp',                              // Documentation/help files
-            '.docx', '.xls', '.xlsx', '.xlsm', '.ppt', '.pptx',  // Office documents
-            '.scn',                                               // Scene files
-            '.stl', '.obj', '.step', '.stp', '.iges', '.igs',    // 3D model files
-            '.xdd', '.eds', '.gsd', '.gsdml',                    // Device description files
-            '.exe', '.dll',                                       // Executables
-            '.zip', '.rar', '.7z',                               // Archives
-            '.bin', '.dat',                                       // Binary data files
-            '.csv', '.json'                                       // Data files
+            '.pdf', '.chm', '.hlp', '.chw',
+            '.docx', '.xls', '.xlsx', '.xlsm', '.ppt', '.pptx',
+            '.scn', '.stl', '.obj', '.step', '.stp', '.iges', '.igs',
+            '.xdd', '.eds', '.gsd', '.gsdml',
+            '.exe', '.dll', '.zip', '.rar', '.7z',
+            '.bin', '.dat', '.csv', '.json',
+            // Alarm/Text configuration
+            '.alcfg', '.algrp', '.txtgrp',
+            // Bus Navigator
+            '.bnc', '.bns', '.set', '.sxostd', '.xostd',
+            // Safety Designer files
+            '.cic', '.ciw', '.dip', '.dit', '.diw', '.gs', '.il', '.ioc', '.lci', '.ldi', '.off', '.pou', '.tdi', '.proj', '.plcproj',
+            '.saf', '.sos', '.sim', '.st1', '.sto', '.pr2',
+            // Data source/version
+            '.dso', '.cvinfo',
+            // Extension/config files
+            '.ext', '.cfg', '.inf', '.ini', '.dir',
+            // Additional files
+            '.lst', '.mev', '.mrk', '.rej', '.resolve', '.txc', '.vcr', '.vcug', '.wwv',
+            '.crcl', '.ibs', '.lov', '.wwd', '.scc',
+            // Web/script files
+            '.html', '.js', '.vbs', '.url',
+            // Graph/Visual
+            '.graphml', '.vcp'
         ];
 
         const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
@@ -746,6 +790,10 @@ class AS4Converter {
                 '.xml', '.pkg', '.apj',
                 // Motion/Axis
                 '.ax', '.apt', '.ncm', '.ncc', '.dob', '.vax',
+                // mappView binding lists
+                '.bindinglist',
+                // mappView expressions
+                '.expression', '.expressiontype',
                 // Localization
                 '.tmx', '.textconfig', '.units',
                 // I/O and mapping
@@ -763,11 +811,16 @@ class AS4Converter {
                 // mappView custom widgets and keyboards
                 '.numpad', '.compoundwidget', '.stylesset',
                 // OPC UA
-                '.uaserver', '.uad',
+                '.uaserver', '.uad', '.uacfg', '.uadcfg',
                 // mapp components
                 '.mpalarmxcore', '.mpalarmxhistory', '.mprecipexml', '.mprecipecsv', '.mpdatarecorder',
                 '.mpalarmxlist', '.mpalarmxcategory', '.mpalarmxquery',
                 '.mpcomgroup', '.mpfilemanagerui',
+                '.mpwebxs', '.mpreportcore', '.mpaudittrail',
+                // mappVision
+                '.visionapplication', '.visioncomponent', '.vicfg',
+                // VC keyboards
+                '.dis',
                 // Security and access
                 '.role', '.user', '.firewallrules',
                 // DTM / Device configuration
@@ -776,8 +829,10 @@ class AS4Converter {
                 '.ett',
                 // Language/Localization
                 '.language',
-                // Safety
-                '.sfapp', '.swt',
+                // Safety (text-based)
+                '.sfapp',
+                // Safety binary files
+                '.swt', '.saf', '.sos', '.sim', '.st1', '.sto', '.pr2',
                 // Media/assets
                 '.jpg', '.svg', '.png', '.gif', '.bmp', '.ico',
                 // Build scripts
@@ -785,7 +840,31 @@ class AS4Converter {
                 // Git/config
                 '.gitignore',
                 // Licenses and docs
-                '.md', '.doc', '.txt'
+                '.md', '.doc', '.txt',
+                // Documents folder files
+                '.pdf', '.chm', '.hlp', '.chw',
+                '.docx', '.xls', '.xlsx', '.xlsm', '.ppt', '.pptx',
+                '.scn', '.stl', '.obj', '.step', '.stp', '.iges', '.igs',
+                '.xdd', '.eds', '.gsd', '.gsdml',
+                '.exe', '.dll', '.zip', '.rar', '.7z',
+                '.bin', '.dat', '.csv', '.json',
+                // Alarm/Text configuration
+                '.alcfg', '.algrp', '.txtgrp',
+                // Bus Navigator
+                '.bnc', '.bns', '.set', '.sxostd', '.xostd',
+                // Safety Designer files (text-based)
+                '.cic', '.ciw', '.dip', '.dit', '.diw', '.gs', '.il', '.ioc', '.lci', '.ldi', '.off', '.pou', '.tdi', '.proj', '.plcproj',
+                // Data source/version
+                '.dso', '.cvinfo',
+                // Extension/config files
+                '.ext', '.cfg', '.inf', '.ini', '.dir',
+                // Additional files
+                '.lst', '.mev', '.mrk', '.rej', '.resolve', '.txc', '.vcr', '.vcug', '.wwv',
+                '.crcl', '.ibs', '.lov', '.wwd', '.scc',
+                // Web/script files
+                '.html', '.js', '.vbs', '.url',
+                // Graph/Visual
+                '.graphml', '.vcp'
             ];
             
             // Folders to exclude (temp/build artifacts)
@@ -901,6 +980,14 @@ class AS4Converter {
         '.a', '.o', '.br',
         // Motion/Axis files
         '.vax',
+        // Safety project files
+        '.saf', '.sos', '.sim', '.swt', '.st1', '.sto', '.pr2',
+        // Help cache
+        '.chw',
+        // Source control cache
+        '.scc',
+        // Cross-reference/order files
+        '.crcl', '.ibs', '.lov', '.wwd',
         // Images
         '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.tif', '.tiff',
         // Documents
@@ -4668,6 +4755,11 @@ ${mappingGroups}
                 // Library_2 library
                 const libVersion = mapping.as6LibVersion;
                 
+                // Skip runtime libraries with null version - they're built into AR, no files to fetch
+                if (libVersion === null || libVersion === undefined) {
+                    return;
+                }
+                
                 if (!requiredPackages.has('Library_2')) {
                     requiredPackages.set('Library_2', {
                         version: null,
@@ -6594,15 +6686,22 @@ ${mappingGroups}
         
         // Get list of technology package libraries whose files will be replaced with AS6 versions
         // We'll skip ALL files from these libraries and fetch fresh AS6 versions instead
+        // Libraries without AS6 replacement files (as6LibVersion: null) will be copied as-is from AS4
         const techPackageLibraries = new Set();
+        
         Object.entries(DeprecationDatabase.as6Format.libraryMapping).forEach(([libName, mapping]) => {
-            if (mapping.techPackage || mapping.source === 'Library_2') {
+            const hasReplacementFiles = mapping.as6LibVersion !== null && mapping.as6LibVersion !== undefined;
+            if ((mapping.techPackage || mapping.source === 'Library_2') && hasReplacementFiles) {
+                // Library has AS6 replacement files to fetch - skip AS4 version
                 techPackageLibraries.add(libName.toLowerCase());
             }
+            // Libraries with null version will NOT be added to techPackageLibraries,
+            // so their AS4 files will be copied as-is
         });
         
         // Add all project files with their directory structure
         // Skip files from technology package libraries - they'll be replaced with AS6 versions
+        // Libraries not in techPackageLibraries (including runtime libraries) are copied as-is
         let fileCount = 0;
         let skippedLibraryFiles = 0;
         const totalFiles = this.projectFiles.size;
@@ -6610,17 +6709,17 @@ ${mappingGroups}
             // Check if this file is inside a technology package library folder
             const pathParts = path.toLowerCase().split(/[/\\]/);
             const libIndex = pathParts.indexOf('libraries');
-            let isTechPackageLibrary = false;
+            let skipLibraryFile = false;
             
             if (libIndex >= 0 && libIndex < pathParts.length - 1) {
                 const libName = pathParts[libIndex + 1];
                 if (techPackageLibraries.has(libName)) {
-                    isTechPackageLibrary = true;
+                    skipLibraryFile = true;
                     skippedLibraryFiles++;
                 }
             }
             
-            if (!isTechPackageLibrary) {
+            if (!skipLibraryFile) {
                 // For binary files, pass the ArrayBuffer with binary option
                 if (file.isBinary) {
                     projectFolder.file(path, file.content, { binary: true });
@@ -6636,7 +6735,7 @@ ${mappingGroups}
         });
         
         if (skippedLibraryFiles > 0) {
-            console.log(`Skipped ${skippedLibraryFiles} files from technology package libraries (will be replaced with AS6 versions)`);
+            console.log(`Skipped ${skippedLibraryFiles} files from technology package and runtime libraries`);
         }
         
         // Add AS6 structural changes info
