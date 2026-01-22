@@ -202,6 +202,12 @@ Technology packages are in:
 9. Added deprecated function block removal (MpAlarmXAcknowledgeAll - removes from .var/.typ, comments out usages)
 10. Added OPC UA role configuration - extracts roles from Role.role files and adds them to UaDvConfig.uadcfg with all permissions enabled
 11. Added mappCockpit technology package support (version 5.24.2 → 6.2.1) with CoTrace library
+12. Fixed document file handling - added ~30 binary extensions (.pdf, .chm, .stl, .exe, .dll, .scn, .xdd, .xlsm, etc.) to both processFiles and processExtractedFiles for proper ZIP upload support
+13. Added mappView technology package detection from file types (.binding, .eventbinding, .mappviewcfg files) instead of library scanning
+14. Fixed memset→brsmemset conversion preview to properly display deprecated_function_call type
+15. Redesigned Report tab UI - moved download button to top, grouped findings in collapsible sections by type
+16. Added MpWebXs (Web Extensions) library removal - auto-removes discontinued package, .mpwebxs config files, and all references in Package.pkg and .sw files
+17. Updated MpWebXs severity from 'error' to 'warning' for non-blocking deprecation
 
 ## Technology Packages Supported
 
@@ -220,6 +226,68 @@ Technology packages are in:
 When converting OPC UA (OpcUA → OpcUaCs):
 - Roles are extracted from `Role.role` files in the project
 - Each role is added to `UaDvConfig.uadcfg` in the `DefaultRolePermissions` group
+- All 8 permissions are enabled for each role:
+  - PermissionBrowse, PermissionRead, PermissionWrite, PermissionCall
+  - PermissionReadRolePermissions, PermissionWriteRolePermissions
+  - PermissionWriteAttribute, PermissionReadHistory
+- If no Role.role file exists, only the default "Everyone" role is created
+
+## File Type Support - Extensions
+
+### Binary Extensions (Read as base64)
+```javascript
+const BINARY_EXTENSIONS = [
+  // Images
+  '.bmp', '.jpg', '.jpeg', '.png', '.gif', '.tiff', '.ico', '.svg',
+  // Documents
+  '.pdf', '.chm', '.xlsx', '.xlsm', '.docx', '.pptx', '.zip', '.rar',
+  // CAD/3D
+  '.stl', '.step', '.iges', '.dwg', '.dxf',
+  // Executables & Libraries
+  '.exe', '.dll', '.lib', '.obj', '.o',
+  // Firmware & Binary
+  '.bin', '.hex', '.scn', '.xdd',
+  // mapp-specific binary
+  '.mpwebxs', '.mpreportcore', '.mpaudittrail'
+]
+```
+
+### File Types Supported in ZIP/Folder Uploads
+Both processFiles() and processExtractedFiles() include these extensions in `relevantExtensions`:
+- Source files: `.st`, `.c`, `.h`, `.cpp`, `.hpp`, `.asm`
+- Configuration: `.pkg`, `.sw`, `.apj`, `.typ`, `.var`, `.con`, `.acr`, `.hws`, `.pnl`
+- mapp components: `.binding`, `.eventbinding`, `.mappviewcfg`, `.visionapplication`, `.visioncomponent`
+- OPC UA: `.uacfg`, `.uadcfg`, `.role`
+- Hardware: `.vicfg`, `.dis`
+- Other: `.mpwebxs`, `.mpreportcore`, `.mpaudittrail`
+
+## Report Tab Features
+
+### Download Section (Top)
+- Download converted project as ZIP
+- Only enabled after successful conversion
+- Position: Above all findings
+
+### Findings Organization
+- Grouped by type (library, deprecated_function_call, etc.)
+- Each group is collapsible/expandable
+- Groups show count of findings (e.g., "Libraries (3)")
+- Color-coded by severity: red (error), orange (warning), blue (info)
+
+### Finding Details
+- Each finding shows:
+  - Name and description
+  - File path (shortened with shortenPath() helper)
+  - Severity indicator
+  - Auto-fix status
+  - Details section (if applicable)
+
+## Helper Functions Added
+
+- `getTypeName(type)` - Convert finding type to display name
+- `shortenPath(filePath)` - Truncate long paths for display (e.g., `...Folder/subfolder/file.txt`)
+- `detectUsedTechPackages()` - Scans project files for technology package markers (file types) to detect usage
+- `autoRemoveMpWebXs()` - Removes MpWebXs library and .mpwebxs config files from project
 - All 8 permissions are enabled for each role:
   - PermissionBrowse, PermissionRead, PermissionWrite, PermissionCall
   - PermissionReadRolePermissions, PermissionWriteRolePermissions

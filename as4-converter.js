@@ -1357,6 +1357,9 @@ class AS4Converter {
             // Auto-update Visual Components firmware version in cpu.pkg files
             this.autoUpdateVcFirmwareVersion();
             
+            // Auto-remove MpWebXs technology package (not supported in AS6)
+            this.autoRemoveMpWebXs();
+            
             // Update UI
             this.displayAnalysisResults();
             this.switchTab('analysis');
@@ -4421,6 +4424,124 @@ ${mappingGroups}
         });
         
         console.log(`VC FirmwareVersion update complete: ${updatedCount} entries updated`);
+    }
+
+    /**
+     * Remove MpWebXs technology package - not supported in AS6
+     * This removes:
+     * - MpWebXs library from Package.pkg and .sw files
+     * - .mpwebxs configuration files from Package.pkg
+     * - Actual .mpwebxs files from the project
+     */
+    autoRemoveMpWebXs() {
+        console.log('Checking for MpWebXs (not supported in AS6)...');
+        
+        let removedLibraryCount = 0;
+        let removedConfigCount = 0;
+        const removedFiles = [];
+        
+        // Find all .mpwebxs files and remove them from the project
+        const mpwebxsFiles = [];
+        this.projectFiles.forEach((file, filePath) => {
+            if (filePath.toLowerCase().endsWith('.mpwebxs')) {
+                mpwebxsFiles.push(filePath);
+            }
+        });
+        
+        if (mpwebxsFiles.length > 0) {
+            console.log(`Found ${mpwebxsFiles.length} .mpwebxs configuration files to remove`);
+            
+            // Remove the files from projectFiles
+            mpwebxsFiles.forEach(filePath => {
+                this.projectFiles.delete(filePath);
+                removedFiles.push(filePath);
+                console.log(`Removed .mpwebxs file: ${filePath}`);
+                
+                // Add finding for removed config file
+                this.addFinding({
+                    type: 'deprecated_config',
+                    severity: 'info',
+                    category: 'mapp',
+                    name: 'MpWebXs configuration removed',
+                    description: 'Removed .mpwebxs configuration file (not supported in AS6)',
+                    file: filePath,
+                    autoFixed: true,
+                    notes: 'MpWebXs technology package is discontinued in AS6. Configuration file has been removed.'
+                });
+            });
+        }
+        
+        // Remove .mpwebxs entries from Package.pkg files
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            
+            const filePathLower = filePath.toLowerCase();
+            if (!filePathLower.endsWith('package.pkg')) return;
+            
+            let content = file.content;
+            let modified = false;
+            
+            // Remove MpWebXs library reference: <Object Type="Library">MpWebXs</Object>
+            const libPattern = />\s*MpWebXs\s*<\/Object>/i;
+            if (libPattern.test(content)) {
+                const removePattern = /\s*<Object[^>]*>\s*MpWebXs\s*<\/Object>\s*\n?/gi;
+                content = content.replace(removePattern, '');
+                console.log(`Removed MpWebXs library from ${filePath}`);
+                removedLibraryCount++;
+                modified = true;
+            }
+            
+            // Remove .mpwebxs file references: <Object Type="File">*.mpwebxs</Object>
+            const configPattern = /\.mpwebxs\s*<\/Object>/i;
+            if (configPattern.test(content)) {
+                const removeConfigPattern = /\s*<Object[^>]*>[^<]*\.mpwebxs\s*<\/Object>\s*\n?/gi;
+                content = content.replace(removeConfigPattern, '');
+                console.log(`Removed .mpwebxs file reference from ${filePath}`);
+                removedConfigCount++;
+                modified = true;
+            }
+            
+            if (modified) {
+                file.content = content;
+            }
+        });
+        
+        // Remove MpWebXs from .sw files
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            
+            const filePathLower = filePath.toLowerCase();
+            if (!filePathLower.endsWith('.sw')) return;
+            
+            let content = file.content;
+            
+            // Remove: <LibraryObject Name="MpWebXs" ... />
+            const libPattern = /<LibraryObject\s+[^>]*Name="MpWebXs"/i;
+            if (libPattern.test(content)) {
+                const removePattern = /\s*<LibraryObject\s+[^>]*Name="MpWebXs"[^>]*\/>\s*\n?/gi;
+                content = content.replace(removePattern, '');
+                console.log(`Removed MpWebXs library from .sw file: ${filePath}`);
+                removedLibraryCount++;
+                file.content = content;
+            }
+        });
+        
+        // Add summary finding if anything was removed
+        if (removedLibraryCount > 0 || removedConfigCount > 0 || removedFiles.length > 0) {
+            this.addFinding({
+                type: 'library',
+                severity: 'info',
+                category: 'mapp',
+                name: 'MpWebXs removed',
+                description: 'MpWebXs technology package removed (not supported in AS6)',
+                file: 'Multiple files',
+                autoFixed: true,
+                notes: `Removed: ${removedLibraryCount} library references, ${removedFiles.length} .mpwebxs config files. MpWebXs is discontinued in AS6.`,
+                details: removedFiles
+            });
+        }
+        
+        console.log(`MpWebXs removal complete: ${removedLibraryCount} library refs, ${removedFiles.length} config files removed`);
     }
 
     /**

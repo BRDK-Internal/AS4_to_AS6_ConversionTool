@@ -655,6 +655,18 @@ const DeprecationDatabase = {
     libraries: [
         // Completely discontinued libraries (no replacement)
         {
+            id: "lib_mpwebxs",
+            name: "MpWebXs",
+            severity: "warning",
+            category: "mapp",
+            description: "MpWebXs technology package - not supported in AS6",
+            replacement: null,
+            notes: "MpWebXs (Web Extensions) technology package is discontinued in AS6. Remove the library and all .mpwebxs configuration files from the project.",
+            removedIn: "AS6.0",
+            configExtension: ".mpwebxs",
+            autoRemove: true
+        },
+        {
             id: "lib_asarcnet",
             name: "AsARCNET",
             severity: "error",
