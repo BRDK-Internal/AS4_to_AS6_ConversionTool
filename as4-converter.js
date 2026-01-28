@@ -573,7 +573,61 @@ class AS4Converter {
                     if (isBinary) {
                         content = await zipEntry.async('base64');
                     } else {
-                        content = await zipEntry.async('text');
+                        // Read as binary first to properly handle encoding
+                        // B&R AS files often use Latin-1/Windows-1252 encoding for special characters
+                        const uint8Array = await zipEntry.async('uint8array');
+                        
+                        // Try to detect if it's UTF-8 or Latin-1 based on content
+                        // UTF-8 multi-byte sequences start with 110xxxxx, 1110xxxx, or 11110xxx
+                        // Latin-1 uses single bytes 0x80-0xFF for special chars
+                        let isValidUtf8 = true;
+                        let i = 0;
+                        while (i < uint8Array.length && i < 1000) { // Check first 1000 bytes
+                            const byte = uint8Array[i];
+                            if (byte >= 0x80) {
+                                if ((byte & 0xE0) === 0xC0) {
+                                    // 2-byte UTF-8 sequence
+                                    if (i + 1 >= uint8Array.length || (uint8Array[i + 1] & 0xC0) !== 0x80) {
+                                        isValidUtf8 = false;
+                                        break;
+                                    }
+                                    i += 2;
+                                } else if ((byte & 0xF0) === 0xE0) {
+                                    // 3-byte UTF-8 sequence
+                                    if (i + 2 >= uint8Array.length || 
+                                        (uint8Array[i + 1] & 0xC0) !== 0x80 || 
+                                        (uint8Array[i + 2] & 0xC0) !== 0x80) {
+                                        isValidUtf8 = false;
+                                        break;
+                                    }
+                                    i += 3;
+                                } else if ((byte & 0xF8) === 0xF0) {
+                                    // 4-byte UTF-8 sequence
+                                    if (i + 3 >= uint8Array.length || 
+                                        (uint8Array[i + 1] & 0xC0) !== 0x80 || 
+                                        (uint8Array[i + 2] & 0xC0) !== 0x80 ||
+                                        (uint8Array[i + 3] & 0xC0) !== 0x80) {
+                                        isValidUtf8 = false;
+                                        break;
+                                    }
+                                    i += 4;
+                                } else {
+                                    // Invalid UTF-8 start byte - likely Latin-1
+                                    isValidUtf8 = false;
+                                    break;
+                                }
+                            } else {
+                                i++;
+                            }
+                        }
+                        
+                        if (isValidUtf8) {
+                            // Decode as UTF-8
+                            content = new TextDecoder('utf-8').decode(uint8Array);
+                        } else {
+                            // Decode as Windows-1252 (Latin-1 superset, common for B&R files)
+                            content = new TextDecoder('windows-1252').decode(uint8Array);
+                        }
                     }
 
                     // Create a File-like object
@@ -1445,6 +1499,9 @@ class AS4Converter {
             
             // Auto-update Visual Components firmware version in cpu.pkg files
             this.autoUpdateVcFirmwareVersion();
+            
+            // Auto-add ChannelBrowsePath to OpcUa_any devices in .hw files
+            this.autoApplyOpcUaAnyChannelBrowsePath();
             
             // Auto-remove MpWebXs technology package (not supported in AS6)
             this.autoRemoveMpWebXs();
@@ -4461,6 +4518,97 @@ ${mappingGroups}
         });
         
         console.log(`SafetyRelease removal complete: ${removedCount} entries removed`);
+    }
+
+    /**
+     * Add ChannelBrowsePath to OpcUa_any device channels in .hw files
+     * AS6 requires ChannelBrowsePath for each channel - AS4 often didn't have them
+     * Preserves existing ChannelBrowsePath values from AS4, adds default "/0:Root" only for missing ones
+     */
+    autoApplyOpcUaAnyChannelBrowsePath() {
+        console.log('Adding ChannelBrowsePath to OpcUa_any channels in .hw files...');
+        
+        let modifiedFiles = 0;
+        let addedBrowsePaths = 0;
+        let preservedBrowsePaths = 0;
+        
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            
+            const ext = filePath.toLowerCase().split('.').pop();
+            if (ext !== 'hw') return;
+            
+            let content = file.content;
+            let originalContent = content;
+            
+            // Find OpcUa_any modules
+            // Pattern: <Module Name="..." Type="OpcUa_any" ...>...</Module>
+            const opcuaAnyPattern = /<Module\s+[^>]*Type="OpcUa_any"[^>]*>([\s\S]*?)<\/Module>/gi;
+            
+            content = content.replace(opcuaAnyPattern, (moduleMatch) => {
+                let moduleContent = moduleMatch;
+                
+                // Find all channel groups and their IDs
+                // Pattern: <Group ID="Channel1" /> or <Group ID="Channel12" />
+                const channelGroupPattern = /<Group\s+ID="Channel(\d+)"\s*\/>/gi;
+                let channelMatch;
+                const channelsToFix = [];
+                
+                // First pass: identify channels that need ChannelBrowsePath
+                while ((channelMatch = channelGroupPattern.exec(moduleContent)) !== null) {
+                    const channelNum = channelMatch[1];
+                    
+                    // Check if ChannelBrowsePath already exists for this channel
+                    const browsePathPattern = new RegExp(`<Parameter\\s+ID="ChannelBrowsePath${channelNum}"\\s+Value="[^"]*"\\s*/>`, 'i');
+                    if (browsePathPattern.test(moduleContent)) {
+                        // ChannelBrowsePath already exists - preserve it (no action needed)
+                        preservedBrowsePaths++;
+                        console.log(`  Preserving existing ChannelBrowsePath${channelNum} in ${filePath}`);
+                    } else {
+                        // ChannelBrowsePath missing - need to add default
+                        // Find the ChannelID parameter for this channel to insert after it
+                        const channelIdPattern = new RegExp(`(<Parameter\\s+ID="ChannelID${channelNum}"\\s+Value="[^"]*"\\s*/>)`, 'i');
+                        if (channelIdPattern.test(moduleContent)) {
+                            channelsToFix.push({
+                                channelNum: channelNum,
+                                pattern: channelIdPattern
+                            });
+                        }
+                    }
+                }
+                
+                // Second pass: add default ChannelBrowsePath after each ChannelID that needs it
+                channelsToFix.forEach(channel => {
+                    moduleContent = moduleContent.replace(channel.pattern, (match, channelIdLine) => {
+                        addedBrowsePaths++;
+                        console.log(`  Adding default ChannelBrowsePath${channel.channelNum} in ${filePath}`);
+                        // Add ChannelBrowsePath right after ChannelID with default value
+                        return `${channelIdLine}\n    <Parameter ID="ChannelBrowsePath${channel.channelNum}" Value="/0:Root" />`;
+                    });
+                });
+                
+                return moduleContent;
+            });
+            
+            if (content !== originalContent) {
+                file.content = content;
+                modifiedFiles++;
+                
+                this.analysisResults.push({
+                    type: 'opcua_config',
+                    severity: 'info',
+                    category: 'configuration',
+                    name: 'OpcUa_any ChannelBrowsePath added',
+                    description: 'Added missing ChannelBrowsePath parameters to OpcUa_any device channels',
+                    file: filePath,
+                    autoFixed: true,
+                    notes: 'AS6 requires ChannelBrowsePath for each OpcUa_any channel. Existing values preserved, default "/0:Root" added for missing channels.',
+                    details: [`Preserved ${preservedBrowsePaths} existing browse paths, added ${addedBrowsePaths} default browse paths`]
+                });
+            }
+        });
+        
+        console.log(`OpcUa_any ChannelBrowsePath update complete: ${modifiedFiles} files modified, ${addedBrowsePaths} default browse paths added, ${preservedBrowsePaths} existing paths preserved`);
     }
 
     /**
