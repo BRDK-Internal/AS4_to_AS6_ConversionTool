@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Start AS4 to AS6 Converter",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "python -m http.server 8000",
+            "cwd": "${workspaceFolder}",
+            "serverReadyAction": {
+                "pattern": "Serving HTTP on",
+                "uriFormat": "http://localhost:8000/as4-to-as6-converter.html",
+                "action": "debugWithChrome"
+            }
+        }
+    ]
+}
