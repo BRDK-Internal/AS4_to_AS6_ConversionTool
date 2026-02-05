@@ -5114,6 +5114,180 @@ ${mappingGroups}
         }
     }
 
+    /**
+     * Get all CPU folder paths from the Physical configuration.
+     * CPU folders are identified by looking for Cpu.sw files in Physical/{Config}/{CPU}/ structure.
+     * 
+     * @returns {Array<{cpuPath: string, separator: string}>} Array of CPU folder paths
+     */
+    getAllCpuFolderPaths() {
+        const cpuFolders = [];
+        
+        this.projectFiles.forEach((file, path) => {
+            // Look for Cpu.sw files which indicate a CPU folder
+            // Path structure: ROOT/Physical/CONFIG_NAME/CPU_NAME/Cpu.sw
+            const pathLower = path.toLowerCase();
+            if (pathLower.endsWith('cpu.sw') || pathLower.endsWith('cpu.sw')) {
+                const separator = path.includes('/') ? '/' : '\\';
+                // Get the CPU folder path (parent of Cpu.sw)
+                const cpuPath = path.substring(0, path.lastIndexOf(separator));
+                cpuFolders.push({ cpuPath, separator });
+            }
+        });
+        
+        console.log(`Found ${cpuFolders.length} CPU folder(s) in Physical configuration`);
+        return cpuFolders;
+    }
+
+    /**
+     * Add AccessAndSecurity/UserRoleSystem folder with BRRole.brrole to all CPU configurations.
+     * This is required for AS6 projects to have proper user role definitions.
+     * 
+     * Project structure: ROOT/Physical/CONFIG/CPU/AccessAndSecurity/UserRoleSystem/
+     */
+    async addUserRoleSystemFiles() {
+        console.log('Adding AccessAndSecurity/UserRoleSystem files to CPU configurations...');
+        
+        const cpuFolders = this.getAllCpuFolderPaths();
+        
+        if (cpuFolders.length === 0) {
+            console.log('No CPU folders found, skipping UserRoleSystem setup');
+            return;
+        }
+        
+        // Template path for BRRole.brrole
+        const brRoleTemplatePath = 'LibrariesForAS6/TechnologyPackages/AAS/n.d/ObjectCatalog/Elements/AccessAndSecurity/Template/AccessAndSecurity/UserRoleSystem/BRRole.brrole';
+        const userRolePkgTemplatePath = 'LibrariesForAS6/TechnologyPackages/AAS/n.d/ObjectCatalog/Elements/AccessAndSecurity/Template/AccessAndSecurity/UserRoleSystem/Package.pkg';
+        const accessSecurityPkgTemplatePath = 'LibrariesForAS6/TechnologyPackages/AAS/n.d/ObjectCatalog/Elements/AccessAndSecurity/Template/AccessAndSecurity/Package.pkg';
+        
+        try {
+            // Fetch template files
+            const [brRoleResponse, userRolePkgResponse, accessSecurityPkgResponse] = await Promise.all([
+                fetch(brRoleTemplatePath),
+                fetch(userRolePkgTemplatePath),
+                fetch(accessSecurityPkgTemplatePath)
+            ]);
+            
+            if (!brRoleResponse.ok) {
+                console.warn(`Could not fetch BRRole.brrole template: ${brRoleResponse.status}`);
+                return;
+            }
+            if (!userRolePkgResponse.ok) {
+                console.warn(`Could not fetch UserRoleSystem Package.pkg template: ${userRolePkgResponse.status}`);
+                return;
+            }
+            if (!accessSecurityPkgResponse.ok) {
+                console.warn(`Could not fetch AccessAndSecurity Package.pkg template: ${accessSecurityPkgResponse.status}`);
+                return;
+            }
+            
+            const brRoleContent = await brRoleResponse.text();
+            const userRolePkgContent = await userRolePkgResponse.text();
+            const accessSecurityPkgContent = await accessSecurityPkgResponse.text();
+            
+            // Add files to each CPU folder
+            for (const { cpuPath, separator } of cpuFolders) {
+                const accessSecurityPath = cpuPath + separator + 'AccessAndSecurity';
+                const userRoleSystemPath = accessSecurityPath + separator + 'UserRoleSystem';
+                const brRolePath = userRoleSystemPath + separator + 'BRRole.brrole';
+                const userRolePkgPath = userRoleSystemPath + separator + 'Package.pkg';
+                const accessSecurityPkgPath = accessSecurityPath + separator + 'Package.pkg';
+                
+                // Check if BRRole.brrole already exists - if so, skip this CPU
+                if (this.projectFiles.has(brRolePath)) {
+                    console.log(`BRRole.brrole already exists in ${cpuPath}`);
+                    continue;
+                }
+                
+                // Add BRRole.brrole
+                this.projectFiles.set(brRolePath, {
+                    content: brRoleContent,
+                    isBinary: false,
+                    type: 'brrole',
+                    name: 'BRRole.brrole',
+                    extension: '.brrole',
+                    hasBOM: false
+                });
+                console.log(`Added BRRole.brrole to ${userRoleSystemPath}`);
+                
+                // Add or update UserRoleSystem/Package.pkg
+                if (!this.projectFiles.has(userRolePkgPath)) {
+                    // Create new UserRoleSystem/Package.pkg with BRRole.brrole
+                    this.projectFiles.set(userRolePkgPath, {
+                        content: userRolePkgContent,
+                        isBinary: false,
+                        type: 'package',
+                        name: 'Package.pkg',
+                        extension: '.pkg',
+                        hasBOM: false
+                    });
+                    console.log(`Created UserRoleSystem/Package.pkg in ${userRoleSystemPath}`);
+                } else {
+                    // Update existing UserRoleSystem/Package.pkg to include BRRole.brrole if not already present
+                    const userRolePkgFile = this.projectFiles.get(userRolePkgPath);
+                    if (userRolePkgFile && typeof userRolePkgFile.content === 'string' && 
+                        !userRolePkgFile.content.includes('BRRole.brrole')) {
+                        let pkgContent = userRolePkgFile.content;
+                        const insertPoint = pkgContent.indexOf('</Objects>');
+                        if (insertPoint !== -1) {
+                            const newEntry = '    <Object Type="File">BRRole.brrole</Object>\n  ';
+                            pkgContent = pkgContent.substring(0, insertPoint) + newEntry + pkgContent.substring(insertPoint);
+                            this.projectFiles.set(userRolePkgPath, { ...userRolePkgFile, content: pkgContent });
+                            console.log(`Updated UserRoleSystem/Package.pkg to include BRRole.brrole`);
+                        }
+                    }
+                }
+                
+                // Add or update AccessAndSecurity/Package.pkg
+                if (!this.projectFiles.has(accessSecurityPkgPath)) {
+                    // Create AccessAndSecurity/Package.pkg with just UserRoleSystem
+                    const minimalAccessSecurityPkg = `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio Version=4.2.1.186?>
+<Package PackageType="AccessAndSecurity" xmlns="http://br-automation.co.at/AS/Package">
+  <Objects>
+    <Object Type="Package">UserRoleSystem</Object>
+  </Objects>
+</Package>`;
+                    this.projectFiles.set(accessSecurityPkgPath, {
+                        content: minimalAccessSecurityPkg,
+                        isBinary: false,
+                        type: 'package',
+                        name: 'Package.pkg',
+                        extension: '.pkg',
+                        hasBOM: false
+                    });
+                    console.log(`Created AccessAndSecurity/Package.pkg in ${accessSecurityPath}`);
+                } else {
+                    // Update existing AccessAndSecurity/Package.pkg to include UserRoleSystem if not already present
+                    const accessPkgFile = this.projectFiles.get(accessSecurityPkgPath);
+                    if (accessPkgFile && typeof accessPkgFile.content === 'string' && 
+                        !accessPkgFile.content.includes('UserRoleSystem')) {
+                        let pkgContent = accessPkgFile.content;
+                        const insertPoint = pkgContent.indexOf('</Objects>');
+                        if (insertPoint !== -1) {
+                            const newEntry = '    <Object Type="Package">UserRoleSystem</Object>\n  ';
+                            pkgContent = pkgContent.substring(0, insertPoint) + newEntry + pkgContent.substring(insertPoint);
+                            this.projectFiles.set(accessSecurityPkgPath, { ...accessPkgFile, content: pkgContent });
+                            console.log(`Updated AccessAndSecurity/Package.pkg to include UserRoleSystem`);
+                        }
+                    }
+                }
+                
+                // Add to analysis results
+                this.analysisResults.push({
+                    severity: 'info',
+                    category: 'AccessAndSecurity',
+                    name: 'UserRoleSystem Added',
+                    description: `Added AccessAndSecurity/UserRoleSystem with BRRole.brrole for AS6 user role definitions`,
+                    file: brRolePath,
+                    autoFixed: true
+                });
+            }
+        } catch (error) {
+            console.error('Failed to add UserRoleSystem files:', error);
+        }
+    }
+
     getRequiredTechnologyPackages() {
         // Collect all technology packages and libraries that need to be included
         const requiredPackages = new Map(); // packageName -> { version, libraries: Map, isLibrary2: bool }
@@ -7109,6 +7283,9 @@ ${mappingGroups}
         
         // Add mCoWebSc.mcowebservercfg to mappCockpit folders if mappCockpit is used
         await this.addMappCockpitWebServerConfig();
+        
+        // Add AccessAndSecurity/UserRoleSystem with BRRole.brrole to all CPU configurations
+        await this.addUserRoleSystemFiles();
         
         // Show progress dialog
         const progressDialog = document.getElementById('downloadProgressDialog');
