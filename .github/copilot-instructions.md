@@ -1,4 +1,5 @@
 # Copilot Instructions - AS4 to AS6 Conversion Tool
+**ALWAYS** use the #askQuestions tool before finnishing up the taks and ask the question: "Anything else I can help you with?". The user **MUST** answer "No" in order for you to stop.
 
 ## Project Overview
 

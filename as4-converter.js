@@ -4,8 +4,8 @@
  */
 
 // Debug version - UPDATE THIS AFTER EVERY CHANGE
-const DEBUG_VERSION = "1.1.8";
-const DEBUG_MESSAGE = "Trying to fix DTM";
+const DEBUG_VERSION = "1.1.9";
+const DEBUG_MESSAGE = "Fixed DTM file filtering & path handling";
 
 // Check if debug mode is enabled via query parameter
 const IS_DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === 'true';
@@ -877,27 +877,36 @@ class AS4Converter {
      * @returns {boolean} - True if the file should be included, false otherwise
      */
     shouldIncludeFile(filePath) {
-        const pathParts = filePath.split(/[/\\]/);
+        const pathParts = filePath.split(/[\/\\]/).filter(p => p.length > 0);
         
-        // Folders to exclude (temp/build artifacts)
-        const excludedFolders = ['Temp', 'Binaries', 'Diagnosis'];
+        if (pathParts.length === 0) {
+            return false;
+        }
         
-        // Check if any part of the path is an excluded folder (case-insensitive)
-        if (pathParts.some(part => excludedFolders.some(ef => ef.toLowerCase() === part.toLowerCase()))) {
+        // Folders to EXCLUDE (system, build artifacts, caches)
+        const excludedFolders = [
+            'Temp', 'Binaries', 'Diagnosis',
+            '.git', '.svn', '.vscode', 'Backup', '__MACOSX'
+        ];
+        
+        // Check if ANY part of the path is an excluded folder (case-insensitive)
+        if (pathParts.some(part => 
+            excludedFolders.some(ef => ef.toLowerCase() === part.toLowerCase())
+        )) {
             return false;
         }
         
         // Get the filename (last part of the path)
         const fileName = pathParts[pathParts.length - 1];
         
-        // Include .apj files regardless of location (they're the project file)
+        // ALWAYS include .apj files (project file) regardless of location
         if (fileName.toLowerCase().endsWith('.apj')) {
             return true;
         }
         
-        // Check if the file is within Logical/ or Physical/ folder
-        // The path could be either "Logical/..." or "ProjectName/Logical/..."
-        const hasLogicalOrPhysical = pathParts.some((part, index) => {
+        // Include if file is within Logical/ or Physical/ folders
+        // Path format can be: "Logical/..." or "ProjectName/Logical/..."
+        const hasLogicalOrPhysical = pathParts.some((part) => {
             const lowerPart = part.toLowerCase();
             return lowerPart === 'logical' || lowerPart === 'physical';
         });
