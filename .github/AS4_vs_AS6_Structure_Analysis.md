@@ -44,7 +44,7 @@ We identify structural differences, technology package migrations, and implicati
 **Actual AS6 Structure (BlizzAS6/TowelFeederPLC):**
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
-<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.1"?>
+<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.5"?>
 <Project Version="1.0.0" Edition="Standard" EditionComment="Standard" 
          xmlns="http://br-automation.co.at/AS/Project">
   <Communication />
@@ -69,7 +69,7 @@ We identify structural differences, technology package migrations, and implicati
 | Attribute | AS4 | AS6 | Impact |
 |-----------|-----|-----|--------|
 | `Version` | `4.9.6.42 SP` | `6.5.0.305` | Breaking - major version change |
-| `WorkingVersion` | `4.9` | `6.1` | Major version change |
+| `WorkingVersion` | `4.9` | `6.5` | Major version change |
 | XML Declaration | Minimal | Full `<?xml version="1.0" encoding="utf-8"?>` | Add to header |
 | XML Namespace | None | `xmlns="http://br-automation.co.at/AS/Project"` | **NEW REQUIRED** |
 | `Project Version` | None | `Version="1.0.0"` | **NEW ATTRIBUTE** |

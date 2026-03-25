@@ -20,7 +20,7 @@ const DeprecationDatabase = {
     as6Format: {
         // Verified from BlizzAS6/TowelFeederPLC.apj
         xmlDeclaration: '<?xml version="1.0" encoding="utf-8"?>',
-        processingInstruction: '<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.1"?>',
+        processingInstruction: '<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.5"?>',
         projectNamespace: 'http://br-automation.co.at/AS/Project',
         
         // Compiler settings - CRITICAL CHANGE
@@ -1743,7 +1743,7 @@ const DeprecationDatabase = {
         
         // Build AS6 format
         let as6Content = `<?xml version="1.0" encoding="utf-8"?>
-<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.1"?>
+<?AutomationStudio Version="6.5.0.305" WorkingVersion="6.5"?>
 <Project Version="1.0.0" Edition="${edition}" EditionComment="${edition}" xmlns="${as6.projectNamespace}">
   <Communication />
   <ANSIC DefaultIncludes="true" />
