@@ -1582,6 +1582,9 @@ class AS4Converter {
         // Check for deprecated struct/FB member names (AS4 → AS6 renames)
         this.scanForDeprecatedMemberNames(path, content);
         
+        // Check for behavioral changes that need manual review (AS4 → AS6)
+        this.scanForBehavioralWarnings(path, content);
+        
         // Check for function calls that match deprecated functions
         DeprecationDatabase.functions.forEach(func => {
             if (func.pattern) {
@@ -1865,6 +1868,44 @@ class AS4Converter {
                         from: fullMatch,
                         to: fullMatch.replace(new RegExp(mapping.pattern, 'i'), mapping.replacement),
                         automated: true
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Scan for behavioral changes in AS6 that cannot be auto-fixed.
+     * These are semantic/timing changes that require manual developer review.
+     * Flags affected lines with informational findings.
+     */
+    scanForBehavioralWarnings(path, content) {
+        const warnings = DeprecationDatabase.as6Format?.behavioralWarnings;
+        if (!warnings || warnings.length === 0) {
+            return;
+        }
+        
+        warnings.forEach(warning => {
+            const pattern = new RegExp(warning.pattern, 'gi');
+            let match;
+            
+            while ((match = pattern.exec(content)) !== null) {
+                this.addFinding({
+                    type: 'behavioral_change',
+                    name: warning.id,
+                    severity: warning.severity,
+                    description: warning.description,
+                    replacement: null,
+                    notes: warning.notes,
+                    file: path,
+                    line: this.getLineNumber(content, match.index),
+                    context: this.getCodeContext(content, match.index),
+                    original: match[0],
+                    autoReplace: false,
+                    parentLibrary: warning.library,
+                    conversion: {
+                        type: 'behavioral_change',
+                        automated: false
                     }
                 });
             }

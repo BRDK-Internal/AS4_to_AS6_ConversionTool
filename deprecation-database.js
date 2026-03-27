@@ -305,7 +305,11 @@ const DeprecationDatabase = {
             { old: 'McAcpAxCamAutCommonFactorsType', new: 'McCamAutCommonFactorsType', notes: 'Common factors' },
             
             // Additional ACOPOS-specific types that may need mapping
-            { old: 'McAcpAxAdvCamAutSetParType', new: 'McAdvCamAutSetParType', notes: 'Advanced cam automat set parameters' }
+            { old: 'McAcpAxAdvCamAutSetParType', new: 'McAdvCamAutSetParType', notes: 'Advanced cam automat set parameters' },
+            
+            // MpAxis recovery parameter types consolidated in AS6
+            { old: 'MpAxisCouplingRecoveryParType', new: 'MpAxisRecoveryParType', notes: 'Recovery parameter type consolidated for MpAxisCoupling' },
+            { old: 'MpAxisSequencerRecoveryParType', new: 'MpAxisRecoveryParType', notes: 'Recovery parameter type consolidated for MpAxisCamSequencer' }
         ],
         
         // Enum value mappings for AS4 → AS6 migration
@@ -348,6 +352,174 @@ const DeprecationDatabase = {
                 pattern: '\\.Info\\.DigitalInputsStatus\\b',
                 replacement: '.Info.AxisAdditionalInfo.DigitalInputStatus',
                 notes: 'Member path changed: .Info.DigitalInputsStatus → .Info.AxisAdditionalInfo.DigitalInputStatus' 
+            },
+            
+            // ==========================================
+            // MpAxis FB interface changes (AS4 → AS6)
+            // ==========================================
+            
+            // Output rename: StandBy → Standby (affects MpAxisCamSequencer, MpAxisCoupling Info.Cam.StandBy)
+            {
+                structType: 'MpAxis',
+                old: '.StandBy',
+                new: '.Standby',
+                library: 'MpAxis',
+                pattern: '\\.StandBy\\b',
+                replacement: '.Standby',
+                notes: 'Output renamed: StandBy → Standby in AS6 MpAxis FBs'
+            },
+            // Element rename: DataAdress → DataAddress (typo fix across motion types)
+            {
+                structType: 'MpAxis',
+                old: '.DataAdress',
+                new: '.DataAddress',
+                library: 'MpAxis',
+                pattern: '\\.DataAdress\\b',
+                replacement: '.DataAddress',
+                notes: 'Element renamed: DataAdress → DataAddress (typo fix) in AS6'
+            },
+            // MpAxisBasic: .Info.AutoTuneDone promoted to direct FB output .AutoTuneDone
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.AutoTuneDone',
+                new: '.AutoTuneDone',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.AutoTuneDone\\b',
+                replacement: '.AutoTuneDone',
+                notes: 'MpAxisBasic: AutoTuneDone promoted from Info sub-struct to direct FB output in AS6'
+            },
+            // MpAxisBasic: .Info.MechDeviationCompState → .Info.AxisAdditionalInfo.MechDeviationCompState
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.MechDeviationCompState',
+                new: '.Info.AxisAdditionalInfo.MechDeviationCompState',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.MechDeviationCompState\\b',
+                replacement: '.Info.AxisAdditionalInfo.MechDeviationCompState',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6'
+            },
+            // MpAxisBasic: .Info.AutoTuneState → .Info.AxisAdditionalInfo.AutoTuneState
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.AutoTuneState',
+                new: '.Info.AxisAdditionalInfo.AutoTuneState',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.AutoTuneState\\b',
+                replacement: '.Info.AxisAdditionalInfo.AutoTuneState',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6'
+            },
+            // MpAxisBasic: .Info.CommunicationState → .Info.AxisAdditionalInfo.CommunicationState
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.CommunicationState',
+                new: '.Info.AxisAdditionalInfo.CommunicationState',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.CommunicationState\\b',
+                replacement: '.Info.AxisAdditionalInfo.CommunicationState',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6'
+            },
+            // MpAxisBasic: .Info.StartupCount → .Info.AxisAdditionalInfo.StartupCount
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.StartupCount',
+                new: '.Info.AxisAdditionalInfo.StartupCount',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.StartupCount\\b',
+                replacement: '.Info.AxisAdditionalInfo.StartupCount',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6'
+            },
+            // MpAxisBasic: .Info.PLCopenState → .Info.AxisAdditionalInfo.PLCopenState
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.PLCopenState',
+                new: '.Info.AxisAdditionalInfo.PLCopenState',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.PLCopenState\\b',
+                replacement: '.Info.AxisAdditionalInfo.PLCopenState',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6'
+            },
+            // MpAxisBasic: .Info.DigitalInputStatus (singular) → .Info.AxisAdditionalInfo.DigitalInputStatus
+            {
+                structType: 'MpAxisBasic',
+                old: '.Info.DigitalInputStatus',
+                new: '.Info.AxisAdditionalInfo.DigitalInputStatus',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.DigitalInputStatus\\b',
+                replacement: '.Info.AxisAdditionalInfo.DigitalInputStatus',
+                notes: 'Moved into AxisAdditionalInfo sub-struct in AS6 (singular form)'
+            },
+            // MpAxisCoupling/CamSequencer: .Info.ActualOffsetShift → .Info.Offset.ActualShift
+            {
+                structType: 'MpAxisCoupling/CamSequencer',
+                old: '.Info.ActualOffsetShift',
+                new: '.Info.Offset.ActualShift',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.ActualOffsetShift\\b',
+                replacement: '.Info.Offset.ActualShift',
+                notes: 'Offset info restructured: ActualOffsetShift → Offset.ActualShift in AS6'
+            },
+            // MpAxisCoupling/CamSequencer: .Info.OffsetValid → .Info.Offset.Valid
+            {
+                structType: 'MpAxisCoupling/CamSequencer',
+                old: '.Info.OffsetValid',
+                new: '.Info.Offset.Valid',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.OffsetValid\\b',
+                replacement: '.Info.Offset.Valid',
+                notes: 'Offset info restructured: OffsetValid → Offset.Valid in AS6'
+            },
+            // MpAxisCoupling/CamSequencer: .Info.ActualPhaseShift → .Info.Phasing.ActualShift
+            {
+                structType: 'MpAxisCoupling/CamSequencer',
+                old: '.Info.ActualPhaseShift',
+                new: '.Info.Phasing.ActualShift',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.ActualPhaseShift\\b',
+                replacement: '.Info.Phasing.ActualShift',
+                notes: 'Phasing info restructured: ActualPhaseShift → Phasing.ActualShift in AS6'
+            },
+            // MpAxisCoupling/CamSequencer: .Info.PhasingValid → .Info.Phasing.Valid
+            {
+                structType: 'MpAxisCoupling/CamSequencer',
+                old: '.Info.PhasingValid',
+                new: '.Info.Phasing.Valid',
+                library: 'MpAxis',
+                pattern: '\\.Info\\.PhasingValid\\b',
+                replacement: '.Info.Phasing.Valid',
+                notes: 'Phasing info restructured: PhasingValid → Phasing.Valid in AS6'
+            }
+        ],
+        
+        // Behavioral warnings for AS4 → AS6 migration
+        // These are behavioral/semantic changes that cannot be auto-fixed.
+        // The converter flags them for manual developer review.
+        behavioralWarnings: [
+            {
+                id: 'bw_getcamposition_falling_edge',
+                pattern: '\\.GetCamPosition\\b',
+                library: 'MpAxis',
+                severity: 'warning',
+                description: 'MpAxisCoupling.GetCamPosition falling edge now causes motion stop',
+                notes: 'In AS6, a falling edge on GetCamPosition while a movement started via mcAXIS_MOVE_CAM_POSITION_SLAVE is active now results in a motion stop. Review logic that handles the negative edge of this input.',
+                affectedFBs: ['MpAxisCoupling']
+            },
+            {
+                id: 'bw_shift_update_immutable',
+                pattern: '\\.(Offset|Phasing)\\.Shift\\b',
+                library: 'MpAxis',
+                severity: 'warning',
+                description: 'Offset/Phasing Shift parameter can no longer be changed with Update command',
+                notes: 'In AS6, the "Shift" parameter of Offset and Phasing commands for MpAxisCoupling and MpAxisCamSequencer can no longer be changed at runtime using the "Update" command. Rework update logic accordingly.',
+                affectedFBs: ['MpAxisCoupling', 'MpAxisCamSequencer']
+            },
+            {
+                id: 'bw_cmdindependent_valid_timing',
+                pattern: 'CmdIndependentActivation',
+                library: 'MpAxis',
+                severity: 'warning',
+                description: 'CmdIndependentActivation timing change for Offset.Valid / Phasing.Valid',
+                notes: 'In AS6, when CmdIndependentActivation is activated via Update, Info.Offset.Valid and Info.Phasing.Valid are no longer set immediately — they are only set when the axis state is "Synchronized Motion". If the axis exits Synchronized Motion, these outputs are reset. Review any logic that depends on the timing of these flags.',
+                affectedFBs: ['MpAxisCoupling', 'MpAxisCamSequencer']
             }
         ],
         
