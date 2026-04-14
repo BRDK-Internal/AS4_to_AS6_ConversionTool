@@ -34,7 +34,9 @@ A web-based tool for migrating B&R Automation Studio 4 (AS4) projects to Automat
 
    📦 **Download here:** [AS6 Library Pack (SharePoint)](https://abb-my.sharepoint.com/:u:/p/mads-ravn_pedersen_dk/IQD6GnOHao4pQYgsskb2J0ozAZQ3WCFLRfN-QG6DeJNaiME?e=Q6BnRd)
 
-3. **Extract the libraries**
+   Alternative download path for AS6 Library Pack, if you are not an ABB employee: http://gofile.me/3rwUd/dYJOlPurL 
+
+4. **Extract the libraries**
 
    Unzip the downloaded file and place the contents in the `LibrariesForAS6/` folder so that the structure looks like:
 
