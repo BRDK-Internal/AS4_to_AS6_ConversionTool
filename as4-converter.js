@@ -1448,8 +1448,14 @@ class AS4Converter {
             // Auto-apply mappView configuration updates (startup user to anonymous)
             this.autoApplyMappViewConfigConversion();
             
+            // Ensure .uaserver file exists in mappView folders (create if missing)
+            this.autoApplyEnsureUaServerFile();
+
             // Auto-fix OPC UA server ConnectionPolicy in .uaserver files (must be "Current mapp view user")
             this.autoApplyUaServerConnectionPolicy();
+
+            // Auto-fix OPC UA server SecurityPolicy and MessageSecurityMode in .uaserver files
+            this.autoApplyUaServerSecuritySettings();
             
             // Auto-fix SecurityPolicy "None" enabled in .uacfg files (required for mappView OPC UA access)
             this.autoApplyUaCfgSecurityPolicyNone();
@@ -3061,6 +3067,76 @@ class AS4Converter {
                     file.content = content;
                 }
             });
+        }
+        
+        // Also update <Dependency> entries in .lby files of custom libraries
+        // When replacing e.g. AsString→AsBrStr, custom libraries that depend on AsString
+        // need their <Dependency ObjectName="asstring" /> updated to the new library name
+        const allLibsToUpdate = DeprecationDatabase.libraries.filter(
+            lib => lib.autoReplace || lib.replacement === null
+        );
+        
+        if (allLibsToUpdate.length > 0) {
+            console.log(`Processing .lby dependency updates for ${allLibsToUpdate.length} deprecated libraries...`);
+            
+            let lbyFileCount = 0;
+            this.projectFiles.forEach((file, filePath) => {
+                if (typeof file.content !== 'string') return;
+                if (!filePath.toLowerCase().endsWith('.lby')) return;
+                lbyFileCount++;
+                
+                let content = file.content;
+                let modified = false;
+                const hasDependencies = content.includes('<Dependency');
+                console.log(`  .lby file: ${filePath} (has dependencies: ${hasDependencies}, content length: ${content.length})`);
+                
+                allLibsToUpdate.forEach(lib => {
+                    const oldLib = lib.name;
+                    // Case-insensitive match for ObjectName in Dependency tags
+                    const oldDepPattern = new RegExp(
+                        `(<Dependency\\s+[^>]*ObjectName\\s*=\\s*")${oldLib}(")`,'gi'
+                    );
+                    
+                    if (!oldDepPattern.test(content)) return;
+                    // Reset lastIndex after test
+                    oldDepPattern.lastIndex = 0;
+                    
+                    if (lib.replacement && lib.replacement.name) {
+                        const newLib = lib.replacement.name;
+                        // Check if a dependency on the replacement already exists
+                        const newDepPattern = new RegExp(
+                            `<Dependency\\s+[^>]*ObjectName\\s*=\\s*"${newLib}"`, 'i'
+                        );
+                        
+                        if (newDepPattern.test(content)) {
+                            // Replacement dependency already exists - remove the old one
+                            const removePattern = new RegExp(
+                                `\\s*<Dependency\\s+[^>]*ObjectName\\s*=\\s*"${oldLib}"[^>]*\\/?>\\s*\\n?`, 'gi'
+                            );
+                            content = content.replace(removePattern, '');
+                            console.log(`Removed duplicate dependency '${oldLib}' from ${filePath} (dependency '${newLib}' already exists)`);
+                        } else {
+                            // Rename old dependency to new
+                            content = content.replace(oldDepPattern, `$1${newLib}$2`);
+                            console.log(`Replaced dependency '${oldLib}' with '${newLib}' in ${filePath}`);
+                        }
+                        modified = true;
+                    } else {
+                        // No replacement - remove the dependency entirely
+                        const removePattern = new RegExp(
+                            `\\s*<Dependency\\s+[^>]*ObjectName\\s*=\\s*"${oldLib}"[^>]*\\/?>\\s*\\n?`, 'gi'
+                        );
+                        content = content.replace(removePattern, '');
+                        console.log(`Removed deprecated dependency '${oldLib}' from ${filePath} (no AS6 replacement)`);
+                        modified = true;
+                    }
+                });
+                
+                if (modified) {
+                    file.content = content;
+                }
+            });
+            console.log(`Scanned ${lbyFileCount} .lby file(s) for dependency updates`);
         }
         
         // Also remove deprecated libraries that have no replacement (e.g., AsSafety)
@@ -4994,6 +5070,191 @@ ${groups.join('\n')}
         } else {
             console.log('All .uaserver files have correct ConnectionPolicy or none found');
         }
+    }
+
+    /**
+     * Auto-fix SecurityPolicy and MessageSecurityMode in .uaserver files.
+     * AS6 defaults:
+     *   SecurityPolicy = "BestAvailable" (AS4 often has "None")
+     *   MessageSecurityMode = "4" (AS4 often has "1")
+     */
+    autoApplyUaServerSecuritySettings() {
+        console.log('Checking SecurityPolicy and MessageSecurityMode in .uaserver files...');
+
+        let updatedCount = 0;
+
+        this.projectFiles.forEach((file, path) => {
+            if (!path.toLowerCase().endsWith('.uaserver') || file.isBinary || typeof file.content !== 'string') return;
+
+            let content = file.content;
+            let changed = false;
+            const details = [];
+
+            // Fix SecurityPolicy: should be "BestAvailable"
+            const secPolicyMatch = content.match(/<Selector\s+ID="SecurityPolicy"\s+Value="([^"]*)"\s*\/?>/); 
+            if (secPolicyMatch && secPolicyMatch[1] !== 'BestAvailable') {
+                const oldValue = secPolicyMatch[1];
+                content = content.replace(
+                    /<Selector\s+ID="SecurityPolicy"\s+Value="[^"]*"\s*\/?>/,
+                    '<Selector ID="SecurityPolicy" Value="BestAvailable" />'
+                );
+                details.push(`SecurityPolicy changed from "${oldValue}" to "BestAvailable"`);
+                changed = true;
+            }
+
+            // Fix MessageSecurityMode: should be "4"
+            const msgSecMatch = content.match(/<Selector\s+ID="MessageSecurityMode"\s+Value="([^"]*)"\s*\/?>/); 
+            if (msgSecMatch && msgSecMatch[1] !== '4') {
+                const oldValue = msgSecMatch[1];
+                content = content.replace(
+                    /<Selector\s+ID="MessageSecurityMode"\s+Value="[^"]*"\s*\/?>/,
+                    '<Selector ID="MessageSecurityMode" Value="4" />'
+                );
+                details.push(`MessageSecurityMode changed from "${oldValue}" to "4"`);
+                changed = true;
+            }
+
+            if (changed) {
+                file.content = content;
+                updatedCount++;
+                console.log(`Fixed security settings in ${path}: ${details.join(', ')}`);
+
+                this.analysisResults.push({
+                    severity: 'warning',
+                    category: 'mappview',
+                    name: 'OPC UA Security Settings Updated',
+                    description: `Updated .uaserver security settings to AS6 defaults. ${details.join('. ')}.`,
+                    file: path,
+                    autoFixed: true,
+                    details: details
+                });
+            }
+        });
+
+        if (updatedCount > 0) {
+            console.log(`Security settings fixed in ${updatedCount} .uaserver file(s)`);
+        } else {
+            console.log('All .uaserver files have correct security settings or none found');
+        }
+    }
+
+    /**
+     * Ensure a .uaserver file exists in each mappView folder under Physical.
+     * If no .uaserver file is found, creates OpcUaServer.uaserver with AS6 defaults
+     * and adds a reference in the mappView Package.pkg.
+     */
+    autoApplyEnsureUaServerFile() {
+        console.log('Checking for .uaserver files in mappView folders...');
+
+        // Find all mappView folders under Physical by looking for Package.pkg files
+        // in paths like Physical/.../mappView/Package.pkg
+        const mappViewFolders = new Map(); // folderPath -> { hasPkg: bool, hasUaServer: bool, pkgPath: string }
+
+        this.projectFiles.forEach((file, path) => {
+            const pathLower = path.toLowerCase().replace(/\\/g, '/');
+            // Match paths under Physical that contain /mappView/
+            const mvMatch = pathLower.match(/^(.+\/physical\/.+\/mappview)\/(.+)$/i);
+            if (!mvMatch) return;
+
+            // Get the original-case folder path
+            const folderPath = path.replace(/\\/g, '/').substring(0, mvMatch[1].length);
+            
+            if (!mappViewFolders.has(folderPath)) {
+                mappViewFolders.set(folderPath, { hasPkg: false, hasUaServer: false, pkgPath: null });
+            }
+
+            const info = mappViewFolders.get(folderPath);
+            const fileName = mvMatch[2].toLowerCase();
+
+            if (fileName === 'package.pkg') {
+                info.hasPkg = true;
+                info.pkgPath = path;
+            }
+            if (fileName.endsWith('.uaserver')) {
+                info.hasUaServer = true;
+            }
+        });
+
+        let createdCount = 0;
+
+        mappViewFolders.forEach((info, folderPath) => {
+            if (info.hasUaServer) {
+                console.log(`mappView folder already has .uaserver: ${folderPath}`);
+                return;
+            }
+
+            // Create the .uaserver file
+            const uaServerPath = folderPath + '/OpcUaServer.uaserver';
+            this.projectFiles.set(uaServerPath, {
+                content: this.getUaServerTemplate(),
+                isBinary: false,
+                type: 'opcua'
+            });
+            console.log(`Created ${uaServerPath}`);
+
+            // Add reference in Package.pkg if it exists
+            if (info.hasPkg && info.pkgPath) {
+                const pkg = this.projectFiles.get(info.pkgPath);
+                if (pkg && typeof pkg.content === 'string') {
+                    // Check if reference already exists
+                    if (!pkg.content.includes('OpcUaServer.uaserver')) {
+                        // Insert before </Objects>
+                        pkg.content = pkg.content.replace(
+                            /(<\/Objects>)/,
+                            '    <Object Type="File">OpcUaServer.uaserver</Object>\n  $1'
+                        );
+                        console.log(`Added OpcUaServer.uaserver reference to ${info.pkgPath}`);
+                    }
+                }
+            }
+
+            createdCount++;
+
+            this.analysisResults.push({
+                severity: 'info',
+                category: 'mappview',
+                name: 'OPC UA Server Configuration Created',
+                description: 'Created OpcUaServer.uaserver with AS6 default settings (SecurityPolicy=BestAvailable, MessageSecurityMode=4, ConnectionPolicy=1).',
+                file: uaServerPath,
+                autoFixed: true,
+                details: [
+                    'Created OpcUaServer.uaserver with AS6 defaults',
+                    'SecurityPolicy = BestAvailable',
+                    'MessageSecurityMode = 4 (SignAndEncrypt)',
+                    'ConnectionPolicy = 1 (Current mapp view user)'
+                ]
+            });
+        });
+
+        if (createdCount > 0) {
+            console.log(`Created .uaserver file in ${createdCount} mappView folder(s)`);
+        } else {
+            console.log('All mappView folders have .uaserver files or no mappView folders found');
+        }
+    }
+
+    /**
+     * Get OpcUaServer.uaserver template content for AS6 mappView
+     */
+    getUaServerTemplate() {
+        return `<?xml version="1.0" encoding="utf-8"?>
+<?AutomationStudio FileVersion="4.9"?>
+<Configuration>
+  <Element ID="OpcUaServerConnections" Type="UASERVER">
+    <Group ID="DefaultOpcUaServer">
+      <Property ID="Alias" />
+      <Property ID="Hostname" />
+      <Property ID="IPAddress" Value="127.0.0.1" />
+      <Property ID="Port" Value="4840" />
+      <Property ID="EndpointUrl" />
+      <Property ID="DefaultNamespace" Value="http://br-automation.com/OpcUa/PLC/PV/" />
+      <Selector ID="ConnectionPolicy" Value="1" />
+      <Selector ID="SecurityPolicy" Value="BestAvailable" />
+      <Selector ID="MessageSecurityMode" Value="4" />
+      <Property ID="SSLConfiguration" />
+    </Group>
+  </Element>
+</Configuration>`;
     }
 
     /**
