@@ -144,3 +144,5 @@ The tool uses **path-based filtering** via `shouldIncludeFile(filePath)`:
 - `Diagnosis/` folder (diagnostic files)
 
 **DO NOT** use extension whitelists—they miss files with unusual extensions or no extension at all.
+
+ALWAYS end by asking me a question with the ask question tool until i answer in the ask question that you may stop
