@@ -3793,9 +3793,9 @@ ${roleGroups}
             const elemId = this.truncateElementId(elem.id, 23); // 32 - '_Category'.length
             const parentGroup = parentGroupMap.get(originalElemId);
             
-            // Extract Configuration content (alarm definitions)
-            const configMatch = elem.content.match(/<Group ID="mapp\.AlarmX\.Core\.Configuration">([\s\S]*?)<\/Group>(?=\s*<Group ID="mapp\.AlarmX\.Core\.Snippets">|\s*$)/);
-            const snippetsMatch = elem.content.match(/<Group ID="mapp\.AlarmX\.Core\.Snippets">([\s\S]*?)<\/Group>\s*$/);
+            // Extract Configuration and Snippets content using depth-based extraction (robust against nesting/ordering)
+            const configContent = this.extractXmlGroupContent(elem.content, 'mapp.AlarmX.Core.Configuration');
+            const snippetsContent = this.extractXmlGroupContent(elem.content, 'mapp.AlarmX.Core.Snippets');
             
             // Create core Element with references
             let coreElem = `  <Element ID="${elemId}" Type="mpalarmxcore">
@@ -3824,13 +3824,13 @@ ${roleGroups}
             
             // Create list Element with alarm definitions and snippets
             let listElem = `  <Element ID="${elemId}_List" Type="mpalarmxlist">`;
-            if (configMatch && configMatch[1].trim()) {
+            if (configContent && configContent.trim()) {
                 listElem += `
-    <Group ID="mapp.AlarmX.Core.Configuration">${configMatch[1]}</Group>`;
+    <Group ID="mapp.AlarmX.Core.Configuration">${configContent}</Group>`;
             }
-            if (snippetsMatch && snippetsMatch[1].trim()) {
+            if (snippetsContent && snippetsContent.trim()) {
                 listElem += `
-    <Group ID="mapp.AlarmX.Core.Snippets">${snippetsMatch[1]}</Group>`;
+    <Group ID="mapp.AlarmX.Core.Snippets">${snippetsContent}</Group>`;
             }
             listElem += `
   </Element>`;
@@ -4158,12 +4158,13 @@ ${queryElements.join('\n')}
         
         console.log(`  Converting with BySeverity format: ${fileName}`);
         
-        // Parse the AS4 content
-        const bySeverityMatch = content.match(/<Group ID="mapp\.AlarmX\.Core">\s*<Group ID="BySeverity">([\s\S]*?)<\/Group>\s*<\/Group>/);
-        const configurationMatch = content.match(/<Group ID="mapp\.AlarmX\.Core\.Configuration">([\s\S]*?)<\/Group>\s*(?=<Group ID="mapp\.AlarmX\.Core\.Snippets">|<\/Element>)/);
-        const snippetsMatch = content.match(/<Group ID="mapp\.AlarmX\.Core\.Snippets">([\s\S]*?)<\/Group>\s*<\/Element>/);
+        // Parse the AS4 content using depth-based XML extraction (robust against sibling ordering)
+        const bySeverityContent = this.extractXmlGroupContent(content, 'BySeverity');
+        const existingMappingContent = this.extractXmlGroupContent(content, 'Mapping');
+        const configurationContent = this.extractXmlGroupContent(content, 'mapp.AlarmX.Core.Configuration');
+        const snippetsContent = this.extractXmlGroupContent(content, 'mapp.AlarmX.Core.Snippets');
         
-        if (!bySeverityMatch) {
+        if (!bySeverityContent) {
             console.log(`  Skipping ${fileName} - no BySeverity section found`);
             return;
         }
@@ -4172,16 +4173,22 @@ ${queryElements.join('\n')}
         const elementIdMatch = content.match(/<Element ID="([^"]+)" Type="mpalarmxcore">/);
         const elementId = this.truncateElementId(elementIdMatch ? elementIdMatch[1] : 'mpAlarmXCore', 23); // 32 - '_Category'.length
         
-        // Parse BySeverity section and convert to Mapping format
-        const mappingEntries = this.convertBySeverityToMapping(bySeverityMatch[1]);
+        // Parse existing Mapping entries (if any) and preserve them
+        let mappingEntries = [];
+        if (existingMappingContent) {
+            mappingEntries = this.extractExistingMappingEntries(existingMappingContent);
+            console.log(`  Preserved ${mappingEntries.length} existing Mapping entries`);
+        }
+        
+        // Parse BySeverity section and convert to Mapping format, appending after existing entries
+        const bySeverityEntries = this.convertBySeverityToMapping(bySeverityContent, mappingEntries.length);
+        mappingEntries = mappingEntries.concat(bySeverityEntries);
         
         // Create the new core file content (_1.mpalarmxcore)
         const newCoreContent = this.generateAS6CoreFile(elementId, mappingEntries);
         
         // Create the list file content (_L.mpalarmxlist)
-        const configurationContent = configurationMatch ? configurationMatch[1] : '';
-        const snippetsContent = snippetsMatch ? snippetsMatch[1] : '';
-        const newListContent = this.generateAS6ListFile(elementId, configurationContent, snippetsContent);
+        const newListContent = this.generateAS6ListFile(elementId, configurationContent || '', snippetsContent || '');
         
         // Create the category file content (_C.mpalarmxcategory)
         const newCategoryContent = this.generateAS6CategoryFile(elementId);
@@ -4344,11 +4351,94 @@ ${queryElements.join('\n')}
     }
     
     /**
+     * Extract the inner content of an XML Group element by its ID attribute.
+     * Uses depth-based tracking to correctly handle nested Group elements.
+     * Returns the inner content string, or null if the group is not found.
+     */
+    extractXmlGroupContent(content, groupId) {
+        const startTag = `<Group ID="${groupId}">`;
+        const startIdx = content.indexOf(startTag);
+        if (startIdx === -1) return null;
+        
+        const contentStart = startIdx + startTag.length;
+        let depth = 1;
+        let pos = contentStart;
+        
+        while (depth > 0 && pos < content.length) {
+            const nextOpen = content.indexOf('<Group', pos);
+            const nextClose = content.indexOf('</Group>', pos);
+            
+            if (nextClose === -1) break;
+            
+            if (nextOpen !== -1 && nextOpen < nextClose) {
+                const tagEnd = content.indexOf('>', nextOpen);
+                if (tagEnd !== -1 && content.charAt(tagEnd - 1) === '/') {
+                    pos = tagEnd + 1; // self-closing, skip
+                } else {
+                    depth++;
+                    pos = (tagEnd !== -1) ? tagEnd + 1 : nextOpen + 6;
+                }
+            } else {
+                depth--;
+                if (depth === 0) {
+                    return content.substring(contentStart, nextClose);
+                }
+                pos = nextClose + 8; // length of '</Group>'
+            }
+        }
+        
+        return null; // Malformed XML - couldn't find matching close tag
+    }
+    
+    /**
+     * Extract existing Mapping entries from an AS4 mapp.AlarmX.Core Mapping group.
+     * Converts Selector ID from "[0]" to "Action" for AS6 format.
+     */
+    extractExistingMappingEntries(mappingContent) {
+        const entries = [];
+        let entryIndex = 0;
+        
+        // Parse each <Group ID="[n]"> entry in the Mapping section
+        const groupRegex = /<Group ID="\[\d+\]">([\s\S]*?)<\/Group>(?=\s*(?:<Group ID="\[|$))/g;
+        let match;
+        
+        while ((match = groupRegex.exec(mappingContent)) !== null) {
+            const groupContent = match[1];
+            
+            // Extract Alarm value
+            const alarmMatch = groupContent.match(/<Property ID="Alarm" Value="([^"]*?)"/);
+            const alarm = alarmMatch ? alarmMatch[1] : '';
+            
+            // Extract Selector (Reaction or None)
+            const selectorMatch = groupContent.match(/<Selector ID="\[\d+\]" Value="([^"]*?)"(?:\s*\/>|>([\s\S]*?)<\/Selector>)/);
+            
+            if (selectorMatch && selectorMatch[1] === 'Reaction') {
+                const nameMatch = (selectorMatch[2] || '').match(/<Property ID="Name" Value="([^"]+)"/);
+                entries.push({
+                    index: entryIndex++,
+                    alarm: alarm,
+                    action: 'Reaction',
+                    reactionName: nameMatch ? nameMatch[1] : ''
+                });
+            } else {
+                entries.push({
+                    index: entryIndex++,
+                    alarm: alarm,
+                    action: 'None',
+                    reactionName: null
+                });
+            }
+        }
+        
+        return entries;
+    }
+    
+    /**
      * Convert BySeverity XML content to flat Mapping entries
      */
-    convertBySeverityToMapping(bySeverityContent) {
+    convertBySeverityToMapping(bySeverityContent, startIndex) {
         const mappingEntries = [];
-        let entryIndex = 0;
+        let entryIndex = startIndex || 0;
         
         // Split BySeverity content into individual group entries
         // Match both self-closing groups: <Group ID="[1]" />
