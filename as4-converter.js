@@ -1479,6 +1479,9 @@ class AS4Converter {
             // Auto-remove MpWebXs technology package (not supported in AS6)
             this.autoRemoveMpWebXs();
             
+            // Auto-remove passwords from .user files (must be re-hashed by AS6)
+            this.autoApplyUserPasswordRemoval();
+
             // Auto-add BR_Engineer role to all users in .user files (required for mappView OPC UA PV access)
             this.autoApplyUserBREngineerRole();
             
@@ -5439,6 +5442,78 @@ ${groups.join('\n')}
             console.log(`BR_Engineer role added in ${updatedFileCount} .user file(s), ${updatedUserCount} user(s) updated`);
         } else {
             console.log('No .user files found or all users already have BR_Engineer role');
+        }
+    }
+
+    /**
+     * Auto-remove passwords from .user files.
+     * AS6 uses a different password hashing algorithm, so existing hashes are invalid.
+     * Passwords are cleared to force the user to reconfigure them in AS6.
+     */
+    autoApplyUserPasswordRemoval() {
+        console.log('Removing passwords from .user files (incompatible hashing)...');
+        
+        let updatedFileCount = 0;
+        let updatedUserCount = 0;
+        
+        this.projectFiles.forEach((file, path) => {
+            if (!path.toLowerCase().endsWith('.user') || file.isBinary || typeof file.content !== 'string') return;
+            
+            let content = file.content;
+            
+            // Skip if file doesn't look like a user configuration
+            if (!content.includes('<Element') || !content.includes('Type="User"')) return;
+            
+            let fileModified = false;
+            const usersCleared = [];
+            
+            // Match each Element block for users
+            const elementRegex = /<Element\s+ID="([^"]*)"\s+Type="User"[^>]*>[\s\S]*?<\/Element>/g;
+            let match;
+            
+            while ((match = elementRegex.exec(content)) !== null) {
+                const userId = match[1];
+                const elementFullMatch = match[0];
+                
+                // Find Password property with a non-empty Value
+                const passwordMatch = elementFullMatch.match(/<Property\s+ID="Password"\s+Value="([^"]*)"([^/]*)\/>/); 
+                if (!passwordMatch || passwordMatch[1] === '') {
+                    continue; // Already empty or no password property
+                }
+                
+                // Clear the password value and update description
+                const updatedElement = elementFullMatch.replace(
+                    /<Property\s+ID="Password"\s+Value="[^"]*"[^/]*\/>/,
+                    '<Property ID="Password" Value="" Description="Removed during AS6 conversion - must be reconfigured" />'
+                );
+                
+                content = content.replace(elementFullMatch, updatedElement);
+                usersCleared.push(userId);
+                updatedUserCount++;
+                fileModified = true;
+                console.log(`Cleared password for user "${userId}" in ${path}`);
+            }
+            
+            if (fileModified) {
+                file.content = content;
+                updatedFileCount++;
+                
+                this.analysisResults.push({
+                    severity: 'warning',
+                    category: 'security',
+                    name: 'User Passwords Removed',
+                    description: `Cleared passwords for ${usersCleared.length} user(s): ${usersCleared.join(', ')}. AS6 uses a different hashing algorithm — passwords MUST be reconfigured manually in Automation Studio 6.`,
+                    file: path,
+                    autoFixed: true,
+                    details: usersCleared.map(u => `Password cleared for user "${u}" — must be set again in AS6`)
+                });
+            }
+        });
+        
+        if (updatedFileCount > 0) {
+            console.log(`Passwords removed from ${updatedFileCount} .user file(s), ${updatedUserCount} user(s) affected`);
+        } else {
+            console.log('No .user files with passwords found');
         }
     }
 
