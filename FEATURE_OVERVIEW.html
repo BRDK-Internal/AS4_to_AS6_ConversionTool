@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AS4 to AS6 Conversion Tool — Feature Overview</title>
+    <style>
+        :root {
+            --br-orange: #e87722;
+            --br-dark: #1a1a2e;
+            --br-blue: #16213e;
+            --br-accent: #0f3460;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --bg-card: #1e2a3a;
+            --bg-body: #0d1b2a;
+            --border-color: #2a3a4a;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --error: #f44336;
+            --info: #2196f3;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--br-dark) 0%, var(--br-accent) 100%);
+            border-bottom: 3px solid var(--br-orange);
+            padding: 2.5rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            color: #fff;
+            margin-bottom: 1rem;
+        }
+
+        .header h1 span {
+            color: var(--br-orange);
+        }
+
+        .header-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .header-meta-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
+        }
+
+        .header-meta-item strong {
+            color: var(--br-orange);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            color: var(--br-orange);
+            font-size: 1.5rem;
+            margin-bottom: 1.2rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section h3 {
+            color: #fff;
+            font-size: 1.15rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .section h4 {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: rgba(232, 119, 34, 0.15);
+            color: var(--br-orange);
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 2px solid var(--br-orange);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 0.65rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        code {
+            background: rgba(232, 119, 34, 0.1);
+            color: var(--br-orange);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.85em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-auto { background: rgba(76, 175, 80, 0.2); color: var(--success); border: 1px solid var(--success); }
+        .badge-manual { background: rgba(255, 152, 0, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-blocked { background: rgba(244, 67, 54, 0.2); color: var(--error); border: 1px solid var(--error); }
+        .badge-info { background: rgba(33, 150, 243, 0.2); color: var(--info); border: 1px solid var(--info); }
+
+        ul {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+
+        li {
+            margin-bottom: 0.4rem;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-card {
+            background: rgba(232, 119, 34, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.2rem;
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--br-orange);
+        }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        .workflow-steps {
+            display: flex;
+            gap: 0;
+            margin: 1.5rem 0;
+            flex-wrap: wrap;
+        }
+
+        .workflow-step {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 1.2rem;
+            position: relative;
+            text-align: center;
+        }
+
+        .workflow-step:first-child { border-radius: 8px 0 0 8px; }
+        .workflow-step:last-child { border-radius: 0 8px 8px 0; }
+
+        .workflow-step .step-num {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            background: var(--br-orange);
+            color: #fff;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .workflow-step .step-title {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        .workflow-step .step-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+
+        .pipeline-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem;
+            border-left: 3px solid var(--br-orange);
+            margin-bottom: 0.75rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .pipeline-item .pipe-num {
+            background: var(--br-orange);
+            color: #fff;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            text-align: center;
+            border-radius: 50%;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .pipeline-item .pipe-content {
+            flex: 1;
+        }
+
+        .pipeline-item .pipe-title {
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 0.3rem;
+        }
+
+        .pipeline-item .pipe-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .note {
+            background: rgba(33, 150, 243, 0.08);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .note::before {
+            content: "ℹ️ ";
+        }
+
+        .arrow-mapping {
+            color: var(--br-orange);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .workflow-steps { flex-direction: column; }
+            .workflow-step { border-radius: 8px !important; margin-bottom: 0.5rem; }
+            .header h1 { font-size: 1.6rem; }
+            .container { padding: 1rem; }
+        }
+
+        @media print {
+            body { background: #fff; color: #222; }
+            .section { border: 1px solid #ddd; }
+            .header { background: #fff; border-bottom: 3px solid var(--br-orange); }
+            .header h1 { color: #222; }
+            code { background: #f5f5f5; color: #c44; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>AS4 to AS6 <span>Conversion Tool</span></h1>
+    <div class="header-meta">
+        <div class="header-meta-item"><strong>Purpose:</strong> Automated migration of AS4 projects to AS6</div>
+        <div class="header-meta-item"><strong>Deployment:</strong> Browser-based static web app</div>
+        <div class="header-meta-item"><strong>Upload:</strong> Drag & drop / Browse / ZIP</div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- KEY NUMBERS -->
+    <div class="section">
+        <h2>At a Glance</h2>
+        <div class="grid-3">
+            <div class="stat-card">
+                <div class="number">60+</div>
+                <div class="label">Deprecated Libraries Tracked</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">100+</div>
+                <div class="label">Function & Constant Mappings</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">200+</div>
+                <div class="label">Obsolete Hardware Modules</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">20+</div>
+                <div class="label">Auto-Conversion Pipelines</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">8</div>
+                <div class="label">Technology Packages Supported</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">100+</div>
+                <div class="label">Bundled AS6 Replacement Libraries</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- USER INTERFACE -->
+    <div class="section">
+        <h2>User Interface — 4-Tab Workflow</h2>
+        <div class="workflow-steps">
+            <div class="workflow-step">
+                <div class="step-num">1</div>
+                <div class="step-title">📁 Project Selection</div>
+                <div class="step-desc">Upload, file stats, AS version, file tree</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">2</div>
+                <div class="step-title">🔍 Analysis Results</div>
+                <div class="step-desc">Severity cards, filtering, batch actions</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">3</div>
+                <div class="step-title">👁️ Preview Changes</div>
+                <div class="step-desc">Side-by-side diff, apply/undo per change</div>
+            </div>
+            <div class="workflow-step">
+                <div class="step-num">4</div>
+                <div class="step-title">📊 Report</div>
+                <div class="step-desc">Summary, findings, export (HTML/JSON/CSV)</div>
+            </div>
+        </div>
+        <p style="margin-top:1rem; font-size:0.9rem; color:var(--text-secondary);">
+            <strong>15 filter categories:</strong> Libraries, Library Versions, Functions, Function Blocks, Hardware, Project, Compiler, Runtime, Technology Packages, Packages, Task Config, Motion, Localization, Visualization, All
+        </p>
+    </div>
+
+    <!-- PROJECT ANALYSIS -->
+    <div class="section">
+        <h2>Project Analysis & Detection</h2>
+        <p style="margin-bottom:1rem;">Upon upload, the tool automatically scans and identifies:</p>
+        <table>
+            <thead>
+                <tr><th>Detection</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>AS Version</strong></td><td>Reads XML processing instruction from <code>.apj</code> to determine AS4.x version</td></tr>
+                <tr><td><strong>GCC Compiler</strong></td><td>Identifies 4.1.2 (AS4) vs 11.3.0 (AS6)</td></tr>
+                <tr><td><strong>Automation Runtime</strong></td><td>Validates minimum B4.25 requirement</td></tr>
+                <tr><td><strong>Technology Packages</strong></td><td>Extracts current versions, compares against required AS6 versions</td></tr>
+                <tr><td><strong>Obsolete Hardware</strong></td><td>200+ discontinued PLCs tracked (PPC2000, PP, 5PP, 5PC, 5AP, X20CP…)</td></tr>
+                <tr><td><strong>File Statistics</strong></td><td>Counts ST, PKG, LBY, TMX, motion, HW, and visualization files</td></tr>
+                <tr><td><strong>Hierarchical Tree</strong></td><td>Displays project structure grouped by Logical / Physical / Project</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Blocking Validations</h3>
+        <p>Conversion is halted when:</p>
+        <ul>
+            <li>Project is already AS6 format</li>
+            <li>Obsolete/unsupported hardware is detected</li>
+            <li>AR version is below B4.25</li>
+            <li>VC3 visualization components are present (not convertible)</li>
+        </ul>
+    </div>
+
+    <!-- AUTOMATED CONVERSIONS -->
+    <div class="section">
+        <h2>Automated Conversion Pipeline</h2>
+        <p style="margin-bottom:1.5rem;">These conversions run automatically in priority order:</p>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">1</div>
+            <div class="pipe-content">
+                <div class="pipe-title">Project File (.apj) Conversion</div>
+                <div class="pipe-desc">XML declaration, AS6 namespace, Version attribute, nested IEC → attribute format, GCC 4.1.2 → 11.3.0, adds Communication/ANSIC/Variables elements</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">2</div>
+            <div class="pipe-content">
+                <div class="pipe-title">Library Replacements <span class="badge badge-auto">60+ libraries</span></div>
+                <div class="pipe-desc">Updates both Package.pkg / .sw references AND all code files (.st, .var, .typ, .fun). Duplicate-aware: if replacement exists, old entry is removed.</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">3</div>
+            <div class="pipe-content">
+                <div class="pipe-title">Function Call Replacements <span class="badge badge-auto">100+ mappings</span></div>
+                <div class="pipe-desc">strlen → brsstrlen, memcpy → brsmemcpy, memset → brsmemset, memcmp → brsmemcmp, and 50+ more across all mapped libraries</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">4</div>
+            <div class="pipe-content">
+                <div class="pipe-title">Motion Type Replacements</div>
+                <div class="pipe-desc">30+ McAcpAx* types renamed to McAxis* / Mc* equivalents used in AS6</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">5</div>
+            <div class="pipe-content">
+                <div class="pipe-title">Technology Package Version Updates</div>
+                <div class="pipe-desc">Updates .lby version references for all 8 tracked technology packages to their AS6 versions</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">6</div>
+            <div class="pipe-content">
+                <div class="pipe-title">OPC UA Conversion</div>
+                <div class="pipe-desc">OpcUA/ → OpcUaCs/ folder rename, UAD FileVersion 7/9 → 10, security hardening, package reference updates</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">7</div>
+            <div class="pipe-content">
+                <div class="pipe-title">MpAlarmX Restructuring</div>
+                <div class="pipe-desc">Single .mpalarmxcore split into 4 files: *_1 (core), *_L (list), *_C (category), *_Q (query)</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">8</div>
+            <div class="pipe-content">
+                <div class="pipe-title">MpComGroup Restructuring</div>
+                <div class="pipe-desc">Removes Linking/Subnodes patterns, preserves parent relationships</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">9</div>
+            <div class="pipe-content">
+                <div class="pipe-title">MpDataRecorder Restructuring</div>
+                <div class="pipe-desc">Reorganizes groups (Memory/Record/File), expands alarm configuration (3 defaults)</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">10</div>
+            <div class="pipe-content">
+                <div class="pipe-title">User Configuration</div>
+                <div class="pipe-desc">Clears incompatible password hashes, injects BR_Engineer role</div>
+            </div>
+        </div>
+
+        <div class="pipeline-item">
+            <div class="pipe-num">11</div>
+            <div class="pipe-content">
+                <div class="pipe-title">mappView Anonymous User Config</div>
+                <div class="pipe-desc">Updates .mappviewcfg for AS6 anonymous user handling</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIBRARY REPLACEMENTS -->
+    <div class="section">
+        <h2>Library Replacement Details</h2>
+        <table>
+            <thead>
+                <tr><th>AS4 Library</th><th>AS6 Replacement</th><th>Scope</th><th>Details</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>AsString</code></td><td><code>AsBrStr</code></td><td><span class="badge badge-auto">Auto</span></td><td>13 function mappings (strlen, strcpy, strcmp, strcat…)</td></tr>
+                <tr><td><code>AsMath</code></td><td><code>AsBrMath</code></td><td><span class="badge badge-auto">Auto</span></td><td>11 functions + 22 constants (pi, e, trig)</td></tr>
+                <tr><td><code>AsWStr</code></td><td><code>AsBrWStr</code></td><td><span class="badge badge-auto">Auto</span></td><td>13 wide string functions</td></tr>
+                <tr><td><code>CANIO</code></td><td><code>ArCanOpen</code></td><td><span class="badge badge-auto">Auto</span></td><td>CAN I/O functions</td></tr>
+                <tr><td><code>MpWebXs</code></td><td><em>(removed)</em></td><td><span class="badge badge-auto">Auto</span></td><td>Technology package discontinued</td></tr>
+                <tr><td><code>AsSafety</code></td><td><em>(none)</em></td><td><span class="badge badge-manual">Manual</span></td><td>Requires SafeLOGIC or SafeMOTION decision</td></tr>
+            </tbody>
+        </table>
+        <div class="note">
+            If the replacement library already exists in the project, the deprecated entry is simply removed. If it doesn't exist, the old entry is renamed in place. This prevents duplicates in Package.pkg.
+        </div>
+    </div>
+
+    <!-- TECHNOLOGY PACKAGES -->
+    <div class="section">
+        <h2>Technology Package Handling</h2>
+        <table>
+            <thead>
+                <tr><th>Package</th><th>AS6 Version</th><th>Key Libraries</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>mappServices</code></td><td>6.2.0</td><td>MpAlarmX, MpAudit, MpBackup, MpCom, MpData, MpFile, MpRecipe, MpServer, MpUserX</td></tr>
+                <tr><td><code>mappMotion</code></td><td>6.0.0</td><td>MpAxis, MpCnc, MpRobotics, McAcpAx, McAcpTrak, McAxis, McPathGen + <strong>McDriveLog</strong> (module)</td></tr>
+                <tr><td><code>mappControl</code></td><td>6.1.0</td><td>MpTemp, MpHydAxis, MpPump, MTBasics, MTFilter, MTProfile</td></tr>
+                <tr><td><code>mappView</code></td><td>6.0.0</td><td>Visualization components</td></tr>
+                <tr><td><code>mappVision</code></td><td>6.0.0</td><td>ViAccess, ViBase</td></tr>
+                <tr><td><code>mappCockpit</code></td><td>6.2.1</td><td>CoTrace</td></tr>
+                <tr><td><code>mappSafety</code></td><td>6.2.0</td><td>SfDomain</td></tr>
+                <tr><td><code>Acp10Arnc0</code></td><td>6.2.0</td><td>Acp10_MC, Acp10man, Acp10par, NcGlobal</td></tr>
+            </tbody>
+        </table>
+        <div class="note">
+            SubVersions are generated dynamically — only libraries actually present in the project are included. Modules like McDriveLog (which don't appear in Package.pkg) are always injected for mappMotion.
+        </div>
+    </div>
+
+    <!-- MANUAL REVIEW -->
+    <div class="section">
+        <h2>Manual Review Items</h2>
+        <p style="margin-bottom:1rem;">Issues flagged for engineer review (cannot be auto-converted):</p>
+        <table>
+            <thead>
+                <tr><th>Category</th><th>Examples</th><th>Severity</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><strong>Behavioral Changes</strong></td><td>GetCamPosition falling-edge change, Shift command timing, CmdIndependentActivation</td><td><span class="badge badge-manual">Warning</span></td></tr>
+                <tr><td><strong>Deprecated FBs</strong></td><td>MC_BR_*, UaConnect, UaRead — commented out with TODO</td><td><span class="badge badge-manual">Warning</span></td></tr>
+                <tr><td><strong>Obsolete Hardware</strong></td><td>Blocking error with hardware details</td><td><span class="badge badge-blocked">Error</span></td></tr>
+                <tr><td><strong>No Replacement</strong></td><td>AsSafety — requires SafeLOGIC vs SafeMOTION decision</td><td><span class="badge badge-manual">Warning</span></td></tr>
+                <tr><td><strong>Struct Members</strong></td><td>MpReportCore.Name, MpAxis offset/phasing/standby renames</td><td><span class="badge badge-info">Info</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- EXPORT -->
+    <div class="section">
+        <h2>Export & Download</h2>
+        <div class="grid-2">
+            <div>
+                <h3>Converted Project</h3>
+                <ul>
+                    <li><strong>ZIP archive</strong> with all converted files</li>
+                    <li>Replacement libraries auto-bundled from <code>LibrariesForAS6/</code></li>
+                    <li>Temp/, Binaries/, Diagnosis/ excluded</li>
+                </ul>
+            </div>
+            <div>
+                <h3>Analysis Reports</h3>
+                <table>
+                    <thead><tr><th>Format</th><th>Use Case</th></tr></thead>
+                    <tbody>
+                        <tr><td><strong>HTML</strong></td><td>Formatted, printable, browser-viewable</td></tr>
+                        <tr><td><strong>JSON</strong></td><td>Machine-readable, integrations</td></tr>
+                        <tr><td><strong>CSV</strong></td><td>Spreadsheet import, per-finding rows</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <h4>Report Includes</h4>
+        <ul>
+            <li>Executive summary (severity breakdown, stats, recommendation count)</li>
+            <li>All detected findings with file location and context</li>
+            <li>Auto-applied changes log</li>
+            <li>Manual review requirements</li>
+            <li>Technology package inventory</li>
+        </ul>
+    </div>
+
+    <!-- FILE HANDLING -->
+    <div class="section">
+        <h2>File Handling</h2>
+        <div class="grid-2">
+            <div>
+                <h3>Path-Based Filtering</h3>
+                <table>
+                    <thead><tr><th>Included</th><th>Excluded</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>Logical/</code> (all contents)</td><td><code>Temp/</code> (build artifacts)</td></tr>
+                        <tr><td><code>Physical/</code> (all contents)</td><td><code>Binaries/</code> (compiled output)</td></tr>
+                        <tr><td><code>.apj</code> files (project root)</td><td><code>Diagnosis/</code> (diagnostic data)</td></tr>
+                        <tr><td></td><td><code>.git</code>, <code>.svn</code>, <code>__MACOSX</code></td></tr>
+                    </tbody>
+                </table>
+                <div class="note">No extension whitelist — all files in included paths are processed.</div>
+            </div>
+            <div>
+                <h3>Special Handling</h3>
+                <ul>
+                    <li><strong>Binary files:</strong> 50+ extensions (.a, .o, .br, .lby, .vax, .dtm…) — base64 stored, excluded from analysis, passed through unchanged</li>
+                    <li><strong>Encoding:</strong> UTF-8 with multi-byte validation, Windows-1252 fallback for legacy B&R characters</li>
+                    <li><strong>Name limits:</strong> 32-char AS6 element ID limit (smart truncation at camelCase boundaries), 10-char mapp component file name limit</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- RUNNING -->
+    <div class="section">
+        <h2>Running the Tool</h2>
+        <div style="background: #0a0a1a; border-radius: 8px; padding: 1.2rem; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.9rem; margin-bottom: 1rem;">
+            <span style="color: var(--text-secondary);">$</span> <span style="color: var(--success);">python -m http.server 8000</span><br>
+            <span style="color: var(--text-secondary);"># Open</span> <span style="color: var(--info);">http://localhost:8000/as4-to-as6-converter.html</span>
+        </div>
+        <p style="font-size: 0.9rem; color: var(--text-secondary);">
+            No dependencies, no build step, no installation. Runs entirely in the browser.<br>
+            <strong>Recommended browser:</strong> Chrome (Edge has issues with large folder uploads).
+        </p>
+    </div>
+
+</div>
+
+</body>
+</html>
