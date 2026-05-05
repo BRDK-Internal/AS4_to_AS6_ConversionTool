@@ -1379,8 +1379,32 @@ class AS4Converter {
         this.elements.btnScan.disabled = true;
         this.elements.btnScan.textContent = '⏳ Analyzing...';
         
+        // Show scan progress dialog
+        const scanDialog = document.getElementById('scanProgressDialog');
+        const scanBar = document.getElementById('scanProgressBar');
+        const scanPercent = document.getElementById('scanProgressPercent');
+        const scanMessage = document.getElementById('scanProgressMessage');
+        const scanDetails = document.getElementById('scanProgressDetails');
+        
+        const showScanProgress = (percent, message, details) => {
+            if (!scanDialog) return;
+            scanDialog.classList.remove('hidden');
+            scanBar.style.width = `${percent}%`;
+            scanPercent.textContent = `${percent}%`;
+            if (message) scanMessage.textContent = message;
+            if (details) scanDetails.textContent = details;
+        };
+        
+        // Yield to let browser paint
+        const yieldToUI = () => new Promise(resolve => setTimeout(resolve, 0));
+        
+        showScanProgress(0, 'Starting analysis...', '');
+        await yieldToUI();
+        
         try {
             // Check for obsolete target hardware first - this is a blocking error
+            showScanProgress(2, 'Checking hardware compatibility...', '');
+            await yieldToUI();
             const obsoleteHardware = this.detectObsoleteTargetHardware();
             if (obsoleteHardware.length > 0) {
                 // Set blocking error flag
@@ -1405,14 +1429,25 @@ class AS4Converter {
                 });
                 
                 // Display results and show blocking error banner
+                if (scanDialog) scanDialog.classList.add('hidden');
                 this.displayAnalysisResults();
                 this.switchTab('analysis');
                 return; // Stop analysis here - don't continue with other checks
             }
             
-            // Analyze each file
-            for (const [path, file] of this.projectFiles) {
+            // Phase 1: Analyze each file
+            const fileEntries = [...this.projectFiles];
+            const totalFiles = fileEntries.length;
+            for (let i = 0; i < totalFiles; i++) {
+                const [path, file] = fileEntries[i];
                 await this.analyzeFile(path, file);
+                
+                // Update progress every 5% or every 20 files
+                if (i % Math.max(1, Math.floor(totalFiles / 20)) === 0) {
+                    const pct = Math.round(5 + (i / totalFiles) * 35); // 5%–40%
+                    showScanProgress(pct, 'Scanning files for deprecations...', `${i + 1} / ${totalFiles} files`);
+                    await yieldToUI();
+                }
             }
             
             // Sort results by severity
@@ -1421,75 +1456,47 @@ class AS4Converter {
                 return (severityOrder[a.severity] || 3) - (severityOrder[b.severity] || 3);
             });
             
-            // Auto-apply project file conversion (.apj AS4 → AS6)
-            this.autoApplyProjectFileConversion();
+            // Phase 2: Auto-apply conversions with progress updates
+            const autoApplySteps = [
+                ['Applying project file conversion...', () => this.autoApplyProjectFileConversion()],
+                ['Updating library versions...', () => this.autoApplyLibraryVersionUpdates()],
+                ['Replacing deprecated functions...', () => this.autoApplyFunctionReplacements()],
+                ['Replacing deprecated library references...', () => this.autoApplyDeprecatedLibraryReplacements()],
+                ['Applying motion type replacements...', () => this.autoApplyMotionTypeReplacements()],
+                ['Converting OPC UA files...', () => this.autoApplyUadFileConversion()],
+                ['Applying mappServices conversion...', () => this.autoApplyMappServicesConversion()],
+                ['Applying MpDataRecorder conversion...', () => this.autoApplyMpDataRecorderConversion()],
+                ['Applying mappView config updates...', () => this.autoApplyMappViewConfigConversion()],
+                ['Ensuring UA server files...', () => this.autoApplyEnsureUaServerFile()],
+                ['Fixing OPC UA connection policy...', () => this.autoApplyUaServerConnectionPolicy()],
+                ['Fixing OPC UA security settings...', () => this.autoApplyUaServerSecuritySettings()],
+                ['Fixing UA config security policy...', () => this.autoApplyUaCfgSecurityPolicyNone()],
+                ['Removing deprecated function blocks...', () => this.autoApplyDeprecatedFunctionBlockRemoval()],
+                ['Commenting deprecated struct members...', () => this.autoCommentDeprecatedStructMembers()],
+                ['Commenting removed FB inputs/outputs...', () => this.autoCommentRemovedFBInputs()],
+                ['Removing SafetyRelease attributes...', () => { this.autoRemoveSafetyRelease(); this.autoRemoveSafetyRelease(); }],
+                ['Updating VC firmware version...', () => this.autoUpdateVcFirmwareVersion()],
+                ['Fixing OpcUa_any devices...', () => this.autoApplyOpcUaAnyChannelBrowsePath()],
+                ['Removing MpWebXs package...', () => this.autoRemoveMpWebXs()],
+                ['Removing user passwords...', () => this.autoApplyUserPasswordRemoval()],
+                ['Adding BR_Engineer roles...', () => this.autoApplyUserBREngineerRole()],
+                ['Applying config file transforms...', () => this.autoApplyConfigTransforms()],
+            ];
             
-            // Auto-apply library version updates for technology package libraries
-            this.autoApplyLibraryVersionUpdates();
+            for (let i = 0; i < autoApplySteps.length; i++) {
+                const [stepMsg, stepFn] = autoApplySteps[i];
+                const pct = Math.round(40 + (i / autoApplySteps.length) * 55); // 40%–95%
+                showScanProgress(pct, stepMsg, `Step ${i + 1} / ${autoApplySteps.length}`);
+                await yieldToUI();
+                stepFn();
+            }
             
-            // Auto-apply function replacements (memset→brsmemset, etc.)
-            this.autoApplyFunctionReplacements();
+            // Done
+            showScanProgress(100, 'Analysis complete!', `${this.analysisResults.length} findings`);
+            await yieldToUI();
             
-            // Auto-apply deprecated library function and constant replacements (AsMath→AsBrMath, AsString→AsBrStr)
-            this.autoApplyDeprecatedLibraryReplacements();
-            
-            // Auto-apply motion type replacements (McAcpAxCamAutParType→McCamAutParType, etc.)
-            this.autoApplyMotionTypeReplacements();
-            
-            // Auto-apply OPC UA conversion (OpcUA → OpcUaCs, FileVersion 10, config files)
-            this.autoApplyUadFileConversion();
-            
-            // Auto-apply mappServices AlarmX conversion (split core file to AS6 format)
-            this.autoApplyMappServicesConversion();
-            
-            // Auto-apply MpDataRecorder conversion (restructure DataRecorder group to AS6 format)
-            this.autoApplyMpDataRecorderConversion();
-            
-            // Auto-apply mappView configuration updates (startup user to anonymous)
-            this.autoApplyMappViewConfigConversion();
-            
-            // Ensure .uaserver file exists in mappView folders (create if missing)
-            this.autoApplyEnsureUaServerFile();
-
-            // Auto-fix OPC UA server ConnectionPolicy in .uaserver files (must be "Current mapp view user")
-            this.autoApplyUaServerConnectionPolicy();
-
-            // Auto-fix OPC UA server SecurityPolicy and MessageSecurityMode in .uaserver files
-            this.autoApplyUaServerSecuritySettings();
-            
-            // Auto-fix SecurityPolicy "None" enabled in .uacfg files (required for mappView OPC UA access)
-            this.autoApplyUaCfgSecurityPolicyNone();
-            
-            // Auto-remove deprecated function blocks (MpAlarmXAcknowledgeAll, etc.)
-            this.autoApplyDeprecatedFunctionBlockRemoval();
-            
-            // Auto-comment deprecated struct members (McCamAutDefineType.DataSize, etc.)
-            this.autoCommentDeprecatedStructMembers();
-            
-            // Auto-comment removed FB inputs/outputs in AS6
-            this.autoCommentRemovedFBInputs();
-            
-            // Auto-remove SafetyRelease from .pkg files (not supported in AS6)
-            this.autoRemoveSafetyRelease();
-            this.autoRemoveSafetyRelease();
-            
-            // Auto-update Visual Components firmware version in cpu.pkg files
-            this.autoUpdateVcFirmwareVersion();
-            
-            // Auto-add ChannelBrowsePath to OpcUa_any devices in .hw files
-            this.autoApplyOpcUaAnyChannelBrowsePath();
-            
-            // Auto-remove MpWebXs technology package (not supported in AS6)
-            this.autoRemoveMpWebXs();
-            
-            // Auto-remove passwords from .user files (must be re-hashed by AS6)
-            this.autoApplyUserPasswordRemoval();
-
-            // Auto-add BR_Engineer role to all users in .user files (required for mappView OPC UA PV access)
-            this.autoApplyUserBREngineerRole();
-            
-            // Auto-apply mapp config file transforms (remove/rename elements for AS6)
-            this.autoApplyConfigTransforms();
+            // Brief delay so user sees completion
+            await new Promise(resolve => setTimeout(resolve, 300));
             
             // Update UI
             this.displayAnalysisResults();
@@ -1499,6 +1506,7 @@ class AS4Converter {
             console.error('Analysis error:', error);
             alert('Error during analysis: ' + error.message);
         } finally {
+            if (scanDialog) scanDialog.classList.add('hidden');
             this.elements.btnScan.disabled = false;
             this.elements.btnScan.textContent = '🔍 Scan for Deprecations';
         }
