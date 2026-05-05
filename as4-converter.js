@@ -1466,6 +1466,9 @@ class AS4Converter {
             // Auto-comment deprecated struct members (McCamAutDefineType.DataSize, etc.)
             this.autoCommentDeprecatedStructMembers();
             
+            // Auto-comment removed FB inputs/outputs in AS6
+            this.autoCommentRemovedFBInputs();
+            
             // Auto-remove SafetyRelease from .pkg files (not supported in AS6)
             this.autoRemoveSafetyRelease();
             this.autoRemoveSafetyRelease();
@@ -1484,6 +1487,9 @@ class AS4Converter {
 
             // Auto-add BR_Engineer role to all users in .user files (required for mappView OPC UA PV access)
             this.autoApplyUserBREngineerRole();
+            
+            // Auto-apply mapp config file transforms (remove/rename elements for AS6)
+            this.autoApplyConfigTransforms();
             
             // Update UI
             this.displayAnalysisResults();
@@ -1511,6 +1517,8 @@ class AS4Converter {
             case 'structured_text':
             case 'function_block':
             case 'program':
+            case 'variable':
+            case 'type_definition':
                 this.analyzeStructuredText(path, content);
                 break;
             case 'hardware':
@@ -1591,8 +1599,17 @@ class AS4Converter {
         // Check for deprecated struct/FB member names (AS4 → AS6 renames)
         this.scanForDeprecatedMemberNames(path, content);
         
+        // Check for deprecated function block declarations (removed in AS6)
+        this.scanForDeprecatedFunctionBlockDeclarations(path, content);
+        
         // Check for behavioral changes that need manual review (AS4 → AS6)
         this.scanForBehavioralWarnings(path, content);
+        
+        // Check for FB interface changes (removed inputs/outputs in AS6)
+        this.scanForFBInterfaceChanges(path, content);
+        
+        // Check for info type renames/splits in AS6
+        this.scanForInfoTypeRenames(path, content);
         
         // Check for function calls that match deprecated functions
         DeprecationDatabase.functions.forEach(func => {
@@ -1885,6 +1902,45 @@ class AS4Converter {
 
     /**
      * Scan for behavioral changes in AS6 that cannot be auto-fixed.
+    /**
+     * Scan for deprecated function block declarations in .var/.typ/.st/.fun/.prg files.
+     * Reports findings so they appear in the analysis report.
+     */
+    scanForDeprecatedFunctionBlockDeclarations(path, content) {
+        const deprecatedFBs = DeprecationDatabase.deprecatedFunctionBlocks;
+        if (!deprecatedFBs || deprecatedFBs.length === 0) return;
+        
+        const ext = path.toLowerCase().split('.').pop();
+        if (!['var', 'typ', 'st', 'fun', 'prg'].includes(ext)) return;
+        
+        deprecatedFBs.forEach(fb => {
+            const fbPattern = new RegExp(`^\\s*(\\w+)\\s*:\\s*${this.escapeRegex(fb.name)}\\b`, 'gm');
+            let match;
+            
+            while ((match = fbPattern.exec(content)) !== null) {
+                this.addFinding({
+                    type: 'deprecated_function_block',
+                    name: fb.name,
+                    severity: fb.severity,
+                    description: fb.description,
+                    replacement: fb.replacement,
+                    notes: fb.notes,
+                    file: path,
+                    line: this.getLineNumber(content, match.index),
+                    context: this.getCodeContext(content, match.index),
+                    original: match[0],
+                    autoReplace: fb.autoRemove,
+                    conversion: {
+                        type: 'deprecated_function_block',
+                        automated: fb.autoRemove
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Scan for behavioral changes in AS6 that cannot be auto-fixed.
      * These are semantic/timing changes that require manual developer review.
      * Flags affected lines with informational findings.
      */
@@ -1926,6 +1982,177 @@ class AS4Converter {
      */
     escapeRegex(str) {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    /**
+     * Scan for FB interface changes (removed inputs/outputs) in AS6.
+     * Two-pass approach:
+     * 1) Find FB type declarations to collect instance variable names
+     * 2) Scan for assignments to removed members on those instances
+     */
+    scanForFBInterfaceChanges(path, content) {
+        const fbChanges = DeprecationDatabase.fbInterfaceChanges;
+        if (!fbChanges || fbChanges.length === 0) {
+            return;
+        }
+
+        // Group changes by fbType for efficiency
+        const changesByType = {};
+        fbChanges.forEach(change => {
+            if (!changesByType[change.fbType]) {
+                changesByType[change.fbType] = [];
+            }
+            changesByType[change.fbType].push(change);
+        });
+
+        // Pass 1: Collect instance names from this file and all .var/.typ files
+        const instanceMap = {}; // fbType → Set of instance names
+        
+        // Scan current file for declarations
+        for (const fbType of Object.keys(changesByType)) {
+            const declPattern = new RegExp(`\\b(\\w+)\\s*:\\s*${this.escapeRegex(fbType)}\\b`, 'gm');
+            let match;
+            while ((match = declPattern.exec(content)) !== null) {
+                if (!instanceMap[fbType]) instanceMap[fbType] = new Set();
+                instanceMap[fbType].add(match[1]);
+            }
+        }
+
+        // Also scan all loaded .var and .typ files for declarations
+        if (this.projectFiles) {
+            this.projectFiles.forEach((file, filePath) => {
+                if (file.isBinary) return;
+                const ext = filePath.toLowerCase().split('.').pop();
+                if (!['var', 'typ'].includes(ext)) return;
+                
+                for (const fbType of Object.keys(changesByType)) {
+                    const declPattern = new RegExp(`\\b(\\w+)\\s*:\\s*${this.escapeRegex(fbType)}\\b`, 'gm');
+                    let match;
+                    while ((match = declPattern.exec(file.content)) !== null) {
+                        if (!instanceMap[fbType]) instanceMap[fbType] = new Set();
+                        instanceMap[fbType].add(match[1]);
+                    }
+                }
+            });
+        }
+
+        // Pass 2: Scan current file for member access on known instances
+        for (const [fbType, instances] of Object.entries(instanceMap)) {
+            if (instances.size === 0) continue;
+            const changes = changesByType[fbType];
+            
+            for (const instanceName of instances) {
+                for (const change of changes) {
+                    // Match: instanceName.MemberName (with word boundary)
+                    const usagePattern = new RegExp(
+                        `\\b${this.escapeRegex(instanceName)}\\.${this.escapeRegex(change.memberName)}\\b`, 'gi'
+                    );
+                    let match;
+                    
+                    while ((match = usagePattern.exec(content)) !== null) {
+                        // Skip if already commented out
+                        const lineStart = content.lastIndexOf('\n', match.index) + 1;
+                        const lineContent = content.substring(lineStart, content.indexOf('\n', match.index));
+                        if (lineContent.trim().startsWith('//') || lineContent.trim().startsWith('(*')) continue;
+
+                        this.addFinding({
+                            type: 'fb_interface_change',
+                            name: `${change.fbType}.${change.memberName}`,
+                            severity: change.severity,
+                            description: change.description,
+                            replacement: null,
+                            notes: change.notes,
+                            file: path,
+                            line: this.getLineNumber(content, match.index),
+                            context: this.getCodeContext(content, match.index),
+                            original: match[0],
+                            autoReplace: false,
+                            parentLibrary: change.library,
+                            conversion: {
+                                type: 'fb_interface_change',
+                                changeType: change.direction,
+                                automated: change.autoComment || false,
+                                todoMessage: change.todoMessage
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Scan for info structure type renames (split types) in AS6.
+     * Detects usage of old info types that were split into per-FB types.
+     */
+    scanForInfoTypeRenames(path, content) {
+        const renames = DeprecationDatabase.infoTypeRenames;
+        if (!renames || renames.length === 0) {
+            return;
+        }
+
+        renames.forEach(rename => {
+            const pattern = new RegExp(`\\b${this.escapeRegex(rename.old)}\\b`, 'gi');
+            let match;
+
+            while ((match = pattern.exec(content)) !== null) {
+                // Skip commented lines
+                const lineStart = content.lastIndexOf('\n', match.index) + 1;
+                const lineContent = content.substring(lineStart, content.indexOf('\n', match.index));
+                if (lineContent.trim().startsWith('//') || lineContent.trim().startsWith('(*')) continue;
+
+                if (rename.isSplit) {
+                    // Split type: warn with list of possible replacements
+                    this.addFinding({
+                        type: 'info_type_split',
+                        name: rename.old,
+                        severity: 'warning',
+                        description: `${rename.old} split into multiple types in AS6 - manual selection required`,
+                        replacement: {
+                            name: rename.replacements.join(' | '),
+                            description: rename.notes
+                        },
+                        notes: rename.notes,
+                        file: path,
+                        line: this.getLineNumber(content, match.index),
+                        context: this.getCodeContext(content, match.index),
+                        original: match[0],
+                        autoReplace: false,
+                        parentLibrary: rename.library,
+                        conversion: {
+                            type: 'info_type_rename',
+                            automated: false,
+                            possibleReplacements: rename.replacements
+                        }
+                    });
+                } else {
+                    // 1:1 rename: auto-replace
+                    this.addFinding({
+                        type: 'info_type_rename',
+                        name: rename.old,
+                        severity: 'warning',
+                        description: `${rename.old} → ${rename.new} in AS6`,
+                        replacement: {
+                            name: rename.new,
+                            description: rename.notes
+                        },
+                        notes: rename.notes,
+                        file: path,
+                        line: this.getLineNumber(content, match.index),
+                        context: this.getCodeContext(content, match.index),
+                        original: match[0],
+                        autoReplace: true,
+                        parentLibrary: rename.library,
+                        conversion: {
+                            type: 'info_type_rename',
+                            from: rename.old,
+                            to: rename.new,
+                            automated: true
+                        }
+                    });
+                }
+            }
+        });
     }
 
     analyzeXML(path, content) {
@@ -5446,6 +5673,106 @@ ${groups.join('\n')}
     }
 
     /**
+     * Auto-apply mapp configuration file transforms for AS6.
+     * Removes or renames XML elements based on configTransformRules.
+     */
+    autoApplyConfigTransforms() {
+        console.log('Applying mapp config file transforms...');
+        
+        const rules = DeprecationDatabase.configTransformRules;
+        if (!rules || rules.length === 0) {
+            console.log('No config transform rules defined');
+            return;
+        }
+
+        let totalChanges = 0;
+
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            // Only process XML-like config files in Logical/ paths
+            if (!filePath.toLowerCase().includes('logical/')) return;
+            const ext = filePath.toLowerCase().split('.').pop();
+            if (!['xml', 'eventbinding', 'alarmcfg', 'recipe', 'config', 'usercfg'].includes(ext) && 
+                !file.content.trim().startsWith('<?xml') && !file.content.trim().startsWith('<')) return;
+
+            let content = file.content;
+            let modified = false;
+            const appliedRules = [];
+
+            for (const rule of rules) {
+                // Check if this file matches the rule's file pattern
+                const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || '';
+                if (!rule.filePattern.test(fileName) && !rule.filePattern.test(filePath)) continue;
+
+                if (rule.action === 'remove_element') {
+                    // Remove XML element and its contents (handles self-closing and nested)
+                    const elementName = rule.elementPath;
+                    // Match self-closing: <Element ... />
+                    const selfClosingPattern = new RegExp(
+                        `[ \\t]*<${this.escapeRegex(elementName)}\\b[^>]*/>[ \\t]*\\r?\\n?`, 'gi'
+                    );
+                    // Match open/close: <Element ...>...</Element>
+                    const openClosePattern = new RegExp(
+                        `[ \\t]*<${this.escapeRegex(elementName)}\\b[^>]*>[\\s\\S]*?</${this.escapeRegex(elementName)}>[ \\t]*\\r?\\n?`, 'gi'
+                    );
+
+                    const before = content;
+                    content = content.replace(selfClosingPattern, '');
+                    content = content.replace(openClosePattern, '');
+                    if (content !== before) {
+                        modified = true;
+                        totalChanges++;
+                        appliedRules.push(rule);
+                        console.log(`Removed <${elementName}> from ${filePath}`);
+                    }
+                } else if (rule.action === 'rename_element') {
+                    // Rename element tags
+                    const oldEl = rule.oldElement;
+                    const newEl = rule.newElement;
+                    // Self-closing
+                    const selfPattern = new RegExp(
+                        `(<)${this.escapeRegex(oldEl)}(\\b[^>]*/>)`, 'gi'
+                    );
+                    // Open tag
+                    const openPattern = new RegExp(
+                        `(<)${this.escapeRegex(oldEl)}(\\b[^>]*>)`, 'gi'
+                    );
+                    // Close tag
+                    const closePattern = new RegExp(
+                        `(</)${this.escapeRegex(oldEl)}(>)`, 'gi'
+                    );
+
+                    const before = content;
+                    content = content.replace(selfPattern, `$1${newEl}$2`);
+                    content = content.replace(openPattern, `$1${newEl}$2`);
+                    content = content.replace(closePattern, `$1${newEl}$2`);
+                    if (content !== before) {
+                        modified = true;
+                        totalChanges++;
+                        appliedRules.push(rule);
+                        console.log(`Renamed <${oldEl}> → <${newEl}> in ${filePath}`);
+                    }
+                }
+            }
+
+            if (modified) {
+                file.content = content;
+                this.analysisResults.push({
+                    severity: 'info',
+                    category: 'config_transform',
+                    name: 'Mapp Config Updated',
+                    description: `Applied ${appliedRules.length} config transform(s) to ${filePath}`,
+                    file: filePath,
+                    autoFixed: true,
+                    details: appliedRules.map(r => r.description)
+                });
+            }
+        });
+
+        console.log(`Config transforms complete: ${totalChanges} changes applied`);
+    }
+
+    /**
      * Auto-remove passwords from .user files.
      * AS6 uses a different password hashing algorithm, so existing hashes are invalid.
      * Passwords are cleared to force the user to reconfigure them in AS6.
@@ -5538,20 +5865,24 @@ ${groups.join('\n')}
         
         let removedInstances = 0;
         let commentedUsages = 0;
-        const instanceNames = new Set(); // Track instance names for usage detection
+        const instanceMap = new Map(); // instanceName → { fbName, fb }
         
-        // Step 1: Find and collect all instance names from .var and .typ files
+        // Step 1: Find and collect all instance names from .var, .typ, .st, .fun, .prg files
         deprecatedFBs.forEach(fb => {
             if (!fb.autoRemove) return;
             
             const fbName = fb.name;
-            const fbPattern = new RegExp(`^\\s*(\\w+)\\s*:\\s*${this.escapeRegex(fbName)}\\s*;?\\s*$`, 'gm');
+            // Relaxed pattern: match "instanceName : FBName" with optional semicolons, comments, pragmas
+            // Handles: instanceName : FBType; (* comment *)
+            //          instanceName : FBType; {REDUND_UNREPLICABLE}
+            //          instanceName : FBType;
+            const fbPattern = new RegExp(`^\\s*(\\w+)\\s*:\\s*${this.escapeRegex(fbName)}\\b[^\\n]*$`, 'gm');
             
             this.projectFiles.forEach((file, filePath) => {
                 if (file.isBinary) return;
                 
                 const ext = filePath.toLowerCase().split('.').pop();
-                if (!['var', 'typ'].includes(ext)) return;
+                if (!['var', 'typ', 'st', 'fun', 'prg'].includes(ext)) return;
                 
                 let content = file.content;
                 let match;
@@ -5559,27 +5890,27 @@ ${groups.join('\n')}
                 // Find all instance declarations
                 while ((match = fbPattern.exec(content)) !== null) {
                     const instanceName = match[1];
-                    instanceNames.add(instanceName);
+                    instanceMap.set(instanceName, { fbName, fb });
                     console.log(`Found deprecated FB instance: ${instanceName} : ${fbName} in ${filePath}`);
                 }
             });
         });
         
-        console.log(`Found ${instanceNames.size} deprecated function block instances to process`);
+        console.log(`Found ${instanceMap.size} deprecated function block instances to process`);
         
-        // Step 2: Remove declarations from .var and .typ files
+        // Step 2: Remove declarations from .var, .typ, .st, .fun, .prg files
         deprecatedFBs.forEach(fb => {
             if (!fb.autoRemove) return;
             
             const fbName = fb.name;
-            // Pattern to match: instanceName : FunctionBlockName; (with optional whitespace and comments)
-            const declarationPattern = new RegExp(`^\\s*\\w+\\s*:\\s*${this.escapeRegex(fbName)}\\s*;?\\s*(?:\\/\\/.*)?$`, 'gm');
+            // Relaxed pattern: match any line declaring an instance of this FB type
+            const declarationPattern = new RegExp(`^\\s*\\w+\\s*:\\s*${this.escapeRegex(fbName)}\\b[^\\n]*$`, 'gm');
             
             this.projectFiles.forEach((file, filePath) => {
                 if (file.isBinary) return;
                 
                 const ext = filePath.toLowerCase().split('.').pop();
-                if (!['var', 'typ'].includes(ext)) return;
+                if (!['var', 'typ', 'st', 'fun', 'prg'].includes(ext)) return;
                 
                 let content = file.content;
                 const originalContent = content;
@@ -5610,7 +5941,7 @@ ${groups.join('\n')}
         });
         
         // Step 3: Comment out usages in source code files
-        if (instanceNames.size > 0) {
+        if (instanceMap.size > 0) {
             this.projectFiles.forEach((file, filePath) => {
                 if (file.isBinary) return;
                 
@@ -5627,24 +5958,30 @@ ${groups.join('\n')}
                     const line = lines[i];
                     let shouldComment = false;
                     let matchedInstance = null;
+                    let matchedFbName = null;
+                    
+                    // Skip lines already commented
+                    if (line.trim().startsWith('//') || line.trim().startsWith('(*')) {
+                        newLines.push(line);
+                        continue;
+                    }
                     
                     // Check if this line contains any of the deprecated instances
-                    for (const instanceName of instanceNames) {
+                    for (const [instanceName, info] of instanceMap) {
                         // Pattern to match instance usage: instanceName.xxx or instanceName(
-                        // Also match assignment to instance parameters: instanceName.param := 
                         const usagePattern = new RegExp(`\\b${this.escapeRegex(instanceName)}\\s*[.(]`, 'i');
-                        const assignPattern = new RegExp(`\\b${this.escapeRegex(instanceName)}\\b`, 'i');
                         
-                        if (usagePattern.test(line) || assignPattern.test(line)) {
+                        if (usagePattern.test(line)) {
                             shouldComment = true;
                             matchedInstance = instanceName;
+                            matchedFbName = info.fbName;
                             break;
                         }
                     }
                     
-                    if (shouldComment && !line.trim().startsWith('//') && !line.trim().startsWith('(*')) {
-                        // Comment out the line with explanation
-                        newLines.push(`(* AS6-REMOVED: ${line} *) // TODO: MpAlarmXAcknowledgeAll not supported in AS6 - requires manual reimplementation`);
+                    if (shouldComment) {
+                        // Comment out the line with explanation using the actual FB name
+                        newLines.push(`(* AS6-REMOVED: ${line} *) // TODO: ${matchedFbName} not supported in AS6 - requires manual reimplementation`);
                         modified = true;
                         commentedUsages++;
                         console.log(`Commented out usage in ${filePath}: ${line.trim()}`);
@@ -5665,7 +6002,7 @@ ${groups.join('\n')}
                         file: filePath,
                         autoFixed: true,
                         notes: 'Lines containing deprecated function block instances have been commented out. Manual reimplementation required.',
-                        details: [`Search for "AS6-REMOVED" or "TODO: MpAlarmXAcknowledgeAll" in the file`]
+                        details: [`Search for "AS6-REMOVED" in the file for commented-out lines`]
                     });
                 }
             });
@@ -5749,6 +6086,96 @@ ${groups.join('\n')}
         });
         
         console.log(`Deprecated struct member comment complete: ${commentedCount} usages commented out`);
+    }
+
+    /**
+     * Auto-comment removed FB inputs/outputs in AS6.
+     * Uses fbInterfaceChanges entries where autoComment is true.
+     */
+    autoCommentRemovedFBInputs() {
+        console.log('Commenting removed FB inputs/outputs...');
+        
+        const fbChanges = DeprecationDatabase.fbInterfaceChanges || [];
+        const autoCommentChanges = fbChanges.filter(c => c.autoComment);
+        if (autoCommentChanges.length === 0) {
+            console.log('No auto-comment FB interface changes defined');
+            return;
+        }
+
+        // Collect all instance names for affected FB types
+        const changesByType = {};
+        autoCommentChanges.forEach(change => {
+            if (!changesByType[change.fbType]) changesByType[change.fbType] = [];
+            changesByType[change.fbType].push(change);
+        });
+
+        // Find all instances from .var/.typ files
+        const instanceMap = {}; // fbType → Set of instance names
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            const ext = filePath.toLowerCase().split('.').pop();
+            if (!['var', 'typ', 'st', 'fun', 'prg'].includes(ext)) return;
+
+            for (const fbType of Object.keys(changesByType)) {
+                const declPattern = new RegExp(`\\b(\\w+)\\s*:\\s*${this.escapeRegex(fbType)}\\b`, 'gm');
+                let match;
+                while ((match = declPattern.exec(file.content)) !== null) {
+                    if (!instanceMap[fbType]) instanceMap[fbType] = new Set();
+                    instanceMap[fbType].add(match[1]);
+                }
+            }
+        });
+
+        let commentedCount = 0;
+
+        // Process ST source files
+        this.projectFiles.forEach((file, filePath) => {
+            if (file.isBinary) return;
+            const ext = filePath.toLowerCase().split('.').pop();
+            if (!['st', 'fun', 'prg'].includes(ext)) return;
+
+            const lines = file.content.split('\n');
+            let modified = false;
+            const newLines = [];
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.trim().startsWith('//') || line.trim().startsWith('(*')) {
+                    newLines.push(line);
+                    continue;
+                }
+
+                let commented = false;
+                for (const [fbType, instances] of Object.entries(instanceMap)) {
+                    if (commented) break;
+                    for (const instanceName of instances) {
+                        if (commented) break;
+                        for (const change of changesByType[fbType]) {
+                            const pattern = new RegExp(
+                                `\\b${this.escapeRegex(instanceName)}\\.${this.escapeRegex(change.memberName)}\\b`
+                            );
+                            if (pattern.test(line)) {
+                                const todoMsg = change.todoMessage || `${change.fbType}.${change.memberName} removed in AS6`;
+                                newLines.push(`(* AS6-REMOVED: ${line} *) // TODO: ${todoMsg}`);
+                                modified = true;
+                                commented = true;
+                                commentedCount++;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!commented) {
+                    newLines.push(line);
+                }
+            }
+
+            if (modified) {
+                file.content = newLines.join('\n');
+            }
+        });
+
+        console.log(`Removed FB inputs comment complete: ${commentedCount} usages commented out`);
     }
 
     /**

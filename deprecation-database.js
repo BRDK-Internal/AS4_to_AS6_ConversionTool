@@ -322,7 +322,29 @@ const DeprecationDatabase = {
             { old: 'mpFILE_SORT_BY_SIZE_ASC', new: 'mpFILE_UI_SORT_BY_SIZE_ASC', library: 'MpFile', notes: 'Sort by size ascending' },
             { old: 'mpFILE_SORT_BY_SIZE_DES', new: 'mpFILE_UI_SORT_BY_SIZE_DES', library: 'MpFile', notes: 'Sort by size descending' },
             { old: 'mpFILE_SORT_BY_MOD_TIME_ASC', new: 'mpFILE_UI_SORT_BY_MOD_TIME_ASC', library: 'MpFile', notes: 'Sort by modified time ascending' },
-            { old: 'mpFILE_SORT_BY_MOD_TIME_DESC', new: 'mpFILE_UI_SORT_BY_MOD_TIME_DESC', library: 'MpFile', notes: 'Sort by modified time descending' }
+            { old: 'mpFILE_SORT_BY_MOD_TIME_DESC', new: 'mpFILE_UI_SORT_BY_MOD_TIME_DESC', library: 'MpFile', notes: 'Sort by modified time descending' },
+            // MpFileManagerUIMessageEnum: mpFILE_MSG_* → mpFILE_UI_MSG_*
+            { old: 'mpFILE_MSG_NONE', new: 'mpFILE_UI_MSG_NONE', library: 'MpFile', notes: 'Message enum: UI prefix added' },
+            { old: 'mpFILE_MSG_CONFIRM_DELETE', new: 'mpFILE_UI_MSG_CONFIRM_DELETE', library: 'MpFile', notes: 'Message enum: UI prefix added' },
+            { old: 'mpFILE_MSG_CONFIRM_OVERWRITE', new: 'mpFILE_UI_MSG_CONFIRM_OVERWRITE', library: 'MpFile', notes: 'Message enum: UI prefix added' },
+            { old: 'mpFILE_MSG_OK', new: 'mpFILE_UI_MSG_OK', library: 'MpFile', notes: 'Message enum: UI prefix added' },
+            { old: 'mpFILE_MSG_BUSY', new: 'mpFILE_UI_MSG_BUSY', library: 'MpFile', notes: 'Message enum: UI prefix added' },
+            // MpFileManagerUIItemTypeEnum: mpFILE_ITEM_* → mpFILE_UI_ITEM_*
+            { old: 'mpFILE_ITEM_FILE', new: 'mpFILE_UI_ITEM_FILE', library: 'MpFile', notes: 'Item type enum: UI prefix added' },
+            { old: 'mpFILE_ITEM_FOLDER', new: 'mpFILE_UI_ITEM_FOLDER', library: 'MpFile', notes: 'Item type enum: UI prefix added' },
+            // MpUserXUIMessageEnum: mpUSERX_MSG_* → mpUSERX_UI_MSG_*
+            { old: 'mpUSERX_MSG_NONE', new: 'mpUSERX_UI_MSG_NONE', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_CONFIRM_DELETE', new: 'mpUSERX_UI_MSG_CONFIRM_DELETE', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_CONFIRM_LOCK', new: 'mpUSERX_UI_MSG_CONFIRM_LOCK', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_CONFIRM_UNLOCK', new: 'mpUSERX_UI_MSG_CONFIRM_UNLOCK', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_CONFIRM_IMPORT', new: 'mpUSERX_UI_MSG_CONFIRM_IMPORT', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_LOGIN_FAILED', new: 'mpUSERX_UI_MSG_LOGIN_FAILED', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            { old: 'mpUSERX_MSG_PASSWORD_CHANGED', new: 'mpUSERX_UI_MSG_PASSWORD_CHANGED', library: 'MpUserX', notes: 'Message enum: UI prefix added' },
+            // MpUserX status constant rename
+            { old: 'mpUSERX_ERR_ROLE_NOT_PRESENT', new: 'mpUSERX_ERR_ROLE_NOT_EXISTING', library: 'MpUserX', notes: 'Status constant renamed in AS6' },
+            // MpRecipe data type renames (old types removed, unified)
+            { old: 'MpRecipeXmlHeaderType', new: 'MpRecipeHeaderType', library: 'MpRecipe', notes: 'Removed - unified into MpRecipeHeaderType' },
+            { old: 'MpRecipeCsvHeaderType', new: 'MpRecipeHeaderType', library: 'MpRecipe', notes: 'Removed - unified into MpRecipeHeaderType' }
         ],
         
         // Struct/FB member mappings for AS4 → AS6 migration
@@ -487,6 +509,51 @@ const DeprecationDatabase = {
                 pattern: '\\.Info\\.PhasingValid\\b',
                 replacement: '.Info.Phasing.Valid',
                 notes: 'Phasing info restructured: PhasingValid → Phasing.Valid in AS6'
+            },
+            
+            // ==========================================
+            // mapp Services FB parameter renames (AS4 → AS6)
+            // ==========================================
+            
+            // MpReportCore: Name → ReportID (extend existing pattern)
+            {
+                structType: 'MpReportCore',
+                old: 'ReportID',
+                new: 'ReportID',
+                library: 'MpReport',
+                pattern: '(MpReportCore\\w*)\\.Name\\b',
+                replacement: '$1.ReportID',
+                notes: 'MpReportCore: Parameter "Name" renamed to "ReportID" (STRING[50]→STRING[255]) in AS6'
+            },
+            // MpUserX: DisplayUnit → MeasurementSystem (on UIConnect types)
+            {
+                structType: 'MpUserX',
+                old: '.DisplayUnit',
+                new: '.MeasurementSystem',
+                library: 'MpUserX',
+                pattern: '\\.DisplayUnit\\b',
+                replacement: '.MeasurementSystem',
+                notes: 'Parameter "DisplayUnit" renamed to "MeasurementSystem" in AS6 MpUserX types'
+            },
+            // MpSequenceCycleType: CurrentTime → CurrentDuration
+            {
+                structType: 'MpSequenceCycleType',
+                old: '.CurrentTime',
+                new: '.CurrentDuration',
+                library: 'MpSequence',
+                pattern: '\\.CurrentTime\\b',
+                replacement: '.CurrentDuration',
+                notes: 'MpSequenceCycleType: "CurrentTime" renamed to "CurrentDuration" in AS6'
+            },
+            // MpSequenceCycleType: LastTime → LastDuration
+            {
+                structType: 'MpSequenceCycleType',
+                old: '.LastTime',
+                new: '.LastDuration',
+                library: 'MpSequence',
+                pattern: '\\.LastTime\\b',
+                replacement: '.LastDuration',
+                notes: 'MpSequenceCycleType: "LastTime" renamed to "LastDuration" in AS6'
             }
         ],
         
@@ -520,6 +587,55 @@ const DeprecationDatabase = {
                 description: 'CmdIndependentActivation timing change for Offset.Valid / Phasing.Valid',
                 notes: 'In AS6, when CmdIndependentActivation is activated via Update, Info.Offset.Valid and Info.Phasing.Valid are no longer set immediately — they are only set when the axis state is "Synchronized Motion". If the axis exits Synchronized Motion, these outputs are reset. Review any logic that depends on the timing of these flags.',
                 affectedFBs: ['MpAxisCoupling', 'MpAxisCamSequencer']
+            },
+            
+            // ==========================================
+            // mapp Services behavioral changes (AS4 → AS6)
+            // ==========================================
+            {
+                id: 'bw_mpsequencecore_start_falling_edge',
+                pattern: '(MpSequenceCore\\w*)\\.Start\\b',
+                library: 'MpSequence',
+                severity: 'warning',
+                description: 'MpSequenceCore: Falling edge on Start no longer stops the sequence',
+                notes: 'In AS6, "Start = FALSE" does not trigger an immediate stop of the sequence. An immediate stop can now be triggered by the newly added parameter "StopImmediate". Review logic that relies on Start falling edge to stop sequences.',
+                affectedFBs: ['MpSequenceCore']
+            },
+            {
+                id: 'bw_mpsequencecore_running_timing',
+                pattern: '(MpSequenceCore\\w*)\\.Running\\b',
+                library: 'MpSequence',
+                severity: 'warning',
+                description: 'MpSequenceCore: Running output only TRUE when sequence actually started',
+                notes: 'In AS6, output "Running" is only set to TRUE when the sequence has actually started. In 5.x, it was TRUE immediately. Review code that depends on the timing of the Running output.',
+                affectedFBs: ['MpSequenceCore']
+            },
+            {
+                id: 'bw_mpuserxloginui_level_change',
+                pattern: '(MpUserXLogin\\w*)\\.Level\\b',
+                library: 'MpUserX',
+                severity: 'warning',
+                description: 'MpUserXLoginUI: Logged out user level changed from -1 to 0',
+                notes: 'In AS6, if a user logs out, the user has level "0" (was "-1" in 5.x). This means MpUserXLogin and MpUserXLoginUI now work the same. Review any code comparing Level == -1 for logout detection.',
+                affectedFBs: ['MpUserXLoginUI', 'MpUserXLogin']
+            },
+            {
+                id: 'bw_mpalarmx_unconfigured_alarms',
+                pattern: 'MpAlarmXSet\\b|MpAlarmXAlarmControl\\b',
+                library: 'MpAlarmX',
+                severity: 'warning',
+                description: 'MpAlarmX: Unconfigured alarms no longer auto-created by default',
+                notes: 'In AS6, non-configured alarms are not created automatically by default. Function "Unconfigured alarms" must be enabled in the MpAlarmXCore configuration. If you use MpAlarmXSet or MpAlarmXAlarmControl to create alarms at runtime, ensure this setting is enabled.',
+                affectedFBs: ['MpAlarmXCore', 'MpAlarmXSet', 'MpAlarmXAlarmControl']
+            },
+            {
+                id: 'bw_mpcomconfigmanager_password',
+                pattern: 'MpComConfigManager\\b',
+                library: 'MpCom',
+                severity: 'info',
+                description: 'MpComConfigManager: Imported configurations with plain text passwords are invalid',
+                notes: 'If a configuration without an encrypted password is imported using MpComConfigManager, the password is invalid for security reasons. The component will show "password not readable" or "password is invalid" in the Logger. Re-encrypt passwords after import.',
+                affectedFBs: ['MpComConfigManager']
             }
         ],
         
@@ -942,9 +1058,386 @@ const DeprecationDatabase = {
             severity: "error",
             description: "MpAlarmXAcknowledgeAll function block is not supported in AS6",
             replacement: null,
-            notes: "This function block must be manually reimplemented. Instances will be removed from .var/.typ files and usages will be commented out in source files for manual review.",
+            notes: "This function block must be manually reimplemented. All alarms can be acknowledged via command 'AcknowledgeAll' on MpAlarmXCore. Instances will be removed from .var/.typ files and usages will be commented out in source files for manual review.",
             removedIn: "AS6.0",
             autoRemove: true
+        },
+        // mapp AlarmX - Configuration function blocks removed
+        {
+            id: "fb_mpalarmxconfigmapping",
+            name: "MpAlarmXConfigMapping",
+            library: "MpAlarmX",
+            severity: "error",
+            description: "MpAlarmXConfigMapping removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpalarmxconfigalarm",
+            name: "MpAlarmXConfigAlarm",
+            library: "MpAlarmX",
+            severity: "error",
+            description: "MpAlarmXConfigAlarm removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Audit - Removed FBs/functions
+        {
+            id: "fb_mpauditclearbuffer",
+            name: "MpAuditClearBuffer",
+            library: "MpAudit",
+            severity: "error",
+            description: "MpAuditClearBuffer removed in AS6 - use MpAuditTrail.Clear command instead",
+            replacement: null,
+            notes: "The function no longer exists with 6.x. The audit buffer can now be deleted using command 'Clear' in MpAuditTrail.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpaudittrailconfig",
+            name: "MpAuditTrailConfig",
+            library: "MpAudit",
+            severity: "error",
+            description: "MpAuditTrailConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Backup - Removed config FB
+        {
+            id: "fb_mpbackupcoreconfig",
+            name: "MpBackupCoreConfig",
+            library: "MpBackup",
+            severity: "error",
+            description: "MpBackupCoreConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Data - Removed config FB
+        {
+            id: "fb_mpdatarecorderconfig",
+            name: "MpDataRecorderConfig",
+            library: "MpData",
+            severity: "error",
+            description: "MpDataRecorderConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Database - MpDatabaseCore replaced by MpDatabaseQuery
+        {
+            id: "fb_mpdatabasecore",
+            name: "MpDatabaseCore",
+            library: "MpDatabase",
+            severity: "error",
+            description: "MpDatabaseCore removed in AS6 - replaced by MpDatabaseQuery",
+            replacement: "MpDatabaseQuery",
+            notes: "The functionality of MpDatabaseCore is completely replaced by MpDatabaseQuery. See 'Getting started' tutorial 'Connecting to a database'.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp File - Removed config FB
+        {
+            id: "fb_mpfilemanagerconfig",
+            name: "MpFileManagerConfig",
+            library: "MpFile",
+            severity: "error",
+            description: "MpFileManagerConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp J1939 - Removed FB
+        {
+            id: "fb_mpj1939generic",
+            name: "MpJ1939Generic",
+            library: "MpJ1939",
+            severity: "error",
+            description: "MpJ1939Generic FB removed in AS6 - functionality applied via configuration",
+            replacement: null,
+            notes: "The function block no longer exists with 6.x. The functionality is completely applied with the MpJ1939Generic configuration.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp PackML - Removed core FB
+        {
+            id: "fb_mppackmlcore",
+            name: "MpPackMLCore",
+            library: "MpPackML",
+            severity: "error",
+            description: "MpPackMLCore removed in AS6 - use MpPackMLStandaloneUnit/SynchronizedUnit config",
+            replacement: null,
+            notes: "The function block was removed with 6.x. The function is completely applied with the MpPackMLStandaloneUnit configuration (standalone mode) or MpPackMLSynchronizedUnit configuration (synchronized mode).",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Sequence - Removed config FBs
+        {
+            id: "fb_mpsequenceaxisconfig",
+            name: "MpSequenceAxisConfig",
+            library: "MpSequence",
+            severity: "error",
+            description: "MpSequenceAxisConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpsequencecommandconfig",
+            name: "MpSequenceCommandConfig",
+            library: "MpSequence",
+            severity: "error",
+            description: "MpSequenceCommandConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpsequenceactuatorconfig",
+            name: "MpSequenceActuatorConfig",
+            library: "MpSequence",
+            severity: "error",
+            description: "MpSequenceActuatorConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp UserX - Removed config FBs and functions
+        {
+            id: "fb_mpuserxconfig",
+            name: "MpUserXConfig",
+            library: "MpUserX",
+            severity: "error",
+            description: "MpUserXConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpuserxloginconfig",
+            name: "MpUserXLoginConfig",
+            library: "MpUserX",
+            severity: "error",
+            description: "MpUserXLoginConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpuserxmappingconfig",
+            name: "MpUserXMappingConfig",
+            library: "MpUserX",
+            severity: "error",
+            description: "MpUserXMappingConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpuserxserverconfig",
+            name: "MpUserXServerConfig",
+            library: "MpUserX",
+            severity: "error",
+            description: "MpUserXServerConfig removed in AS6 - use MpComConfigManager instead",
+            replacement: "MpComConfigManager",
+            notes: "Configuration function blocks no longer exist in mapp Services 6.x. Use MpComConfigManager to change configuration at runtime.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpuserxaccessright",
+            name: "MpUserXAccessRight",
+            library: "MpUserX",
+            severity: "error",
+            description: "MpUserXAccessRight removed in AS6 - rights handled via OPC UA",
+            replacement: null,
+            notes: "The function no longer exists. Access rights are handled with 6.x via OPC UA.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        // mapp Com - Removed functions
+        {
+            id: "fb_mpcomlink",
+            name: "MpComLink",
+            library: "MpCom",
+            severity: "error",
+            description: "MpComLink removed in AS6 - use MpComGroup configuration instead",
+            replacement: null,
+            notes: "The function was used in 5.x to create a mapp hierarchy. With 6.0, the MpComGroup configuration can be used for this purpose.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        },
+        {
+            id: "fb_mpcomlinktoparent",
+            name: "MpComLinkToParent",
+            library: "MpCom",
+            severity: "error",
+            description: "MpComLinkToParent removed in AS6 - use MpComGroup configuration instead",
+            replacement: null,
+            notes: "The function was used in 5.x to create a mapp hierarchy. With 6.0, the MpComGroup configuration can be used for this purpose.",
+            removedIn: "AS6.0",
+            autoRemove: true
+        }
+    ],
+
+    // ==========================================
+    // FB INTERFACE CHANGES (removed inputs/outputs in AS6)
+    // ==========================================
+    // These track FB inputs/outputs that were removed in AS6.
+    // Two-pass approach: 1) Find FB declarations to get instance names
+    //                    2) Scan for assignments to removed members on those instances
+    fbInterfaceChanges: [
+        // mapp Data - MpDataRegPar
+        {
+            id: "fbi_mpdataregpar_unit",
+            fbType: "MpDataRegPar",
+            memberName: "Unit",
+            direction: "input",
+            library: "MpData",
+            severity: "warning",
+            description: "MpDataRegPar.Unit input removed in AS6",
+            notes: "The unit must be defined via the Automation Studio system of units. Parameter 'Unit' has been removed.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpDataRegPar.Unit removed in AS6 - define unit via AS measurement system"
+        },
+        {
+            id: "fbi_mpdataregpar_scalefactor",
+            fbType: "MpDataRegPar",
+            memberName: "ScaleFactor",
+            direction: "input",
+            library: "MpData",
+            severity: "warning",
+            description: "MpDataRegPar.ScaleFactor input removed in AS6",
+            notes: "The unit must be defined via the Automation Studio system of units. Parameter 'ScaleFactor' has been removed.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpDataRegPar.ScaleFactor removed in AS6 - define unit via AS measurement system"
+        },
+        // mapp Data - MpDataRegParLimits
+        {
+            id: "fbi_mpdataregparlimits_unit",
+            fbType: "MpDataRegParLimits",
+            memberName: "Unit",
+            direction: "input",
+            library: "MpData",
+            severity: "warning",
+            description: "MpDataRegParLimits.Unit input removed in AS6",
+            notes: "The unit must be defined via the Automation Studio system of units. Parameter 'Unit' has been removed.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpDataRegParLimits.Unit removed in AS6 - define unit via AS measurement system"
+        },
+        {
+            id: "fbi_mpdataregparlimits_scalefactor",
+            fbType: "MpDataRegParLimits",
+            memberName: "ScaleFactor",
+            direction: "input",
+            library: "MpData",
+            severity: "warning",
+            description: "MpDataRegParLimits.ScaleFactor input removed in AS6",
+            notes: "The unit must be defined via the Automation Studio system of units. Parameter 'ScaleFactor' has been removed.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpDataRegParLimits.ScaleFactor removed in AS6 - define unit via AS measurement system"
+        },
+        // mapp IO - MpIOImport
+        {
+            id: "fbi_mpioimport_importallowed",
+            fbType: "MpIOImport",
+            memberName: "ImportAllowed",
+            direction: "input",
+            library: "MpIO",
+            severity: "warning",
+            description: "MpIOImport.ImportAllowed input removed in AS6",
+            notes: "Importing is now defined via the MpIO configuration parameter 'Allow import'. A BOOL process variable is specified there instead.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpIOImport.ImportAllowed removed in AS6 - configure 'Allow import' in MpIO config"
+        },
+        // mapp CodeBox - MpCodeBoxProgramControl
+        {
+            id: "fbi_mpcodeboxprogramcontrol_reload",
+            fbType: "MpCodeBoxProgramControl",
+            memberName: "Reload",
+            direction: "input",
+            library: "MpCodeBox",
+            severity: "warning",
+            description: "MpCodeBoxProgramControl.Reload input removed in AS6",
+            notes: "Input parameter 'Reload' was reserved in 5.x for later use and was removed with 6.x.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpCodeBoxProgramControl.Reload removed in AS6 - parameter was reserved, no replacement needed"
+        },
+        // mapp Audit - MpAuditTrailUI
+        {
+            id: "fbi_mpaudittrailui_refresh",
+            fbType: "MpAuditTrailUI",
+            memberName: "Refresh",
+            direction: "input",
+            library: "MpAudit",
+            severity: "warning",
+            description: "MpAuditTrailUI.Refresh input removed in AS6",
+            notes: "Events are updated automatically in 6.x. Input parameter 'Refresh' no longer exists.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpAuditTrailUI.Refresh removed in AS6 - events now update automatically"
+        },
+        // mapp UserX - MpUserXLogin
+        {
+            id: "fbi_mpuserxlogin_accessrights",
+            fbType: "MpUserXLogin",
+            memberName: "AccessRights",
+            direction: "output",
+            library: "MpUserX",
+            severity: "warning",
+            description: "MpUserXLogin.AccessRights output removed in AS6",
+            notes: "Access rights are handled with 6.x via OPC UA. Parameter 'AccessRights' no longer exists.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpUserXLogin.AccessRights removed in AS6 - rights are now handled via OPC UA"
+        },
+        // mapp Sequence - MpSequenceCore
+        {
+            id: "fbi_mpsequencecore_importdone",
+            fbType: "MpSequenceCore",
+            memberName: "ImportDone",
+            direction: "output",
+            library: "MpSequence",
+            severity: "warning",
+            description: "MpSequenceCore.ImportDone output removed in AS6",
+            notes: "Output parameters 'ImportDone' and 'ExportDone' no longer exist. Use 'CommandBusy' and 'CommandDone' instead.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpSequenceCore.ImportDone removed in AS6 - use CommandDone instead"
+        },
+        {
+            id: "fbi_mpsequencecore_exportdone",
+            fbType: "MpSequenceCore",
+            memberName: "ExportDone",
+            direction: "output",
+            library: "MpSequence",
+            severity: "warning",
+            description: "MpSequenceCore.ExportDone output removed in AS6",
+            notes: "Output parameters 'ImportDone' and 'ExportDone' no longer exist. Use 'CommandBusy' and 'CommandDone' instead.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpSequenceCore.ExportDone removed in AS6 - use CommandDone instead"
         }
     ],
 
@@ -967,7 +1460,151 @@ const DeprecationDatabase = {
             removedIn: "AS6.0",
             autoComment: true,
             todoMessage: "McCamAutDefineType.DataSize removed in AS6 - remove or rework this line"
+        },
+        // mapp Services - StatusID.Code removed from all StatusID data types
+        {
+            id: "member_statusid_code",
+            structType: "StatusID",
+            memberName: "Code",
+            pattern: "\\.StatusID\\.Code\\b",
+            severity: "warning",
+            description: "StatusID.Code member removed from all mapp Services StatusID types in AS6",
+            notes: "Parameter 'Code' was removed from all StatusID data types in AS6. Additional information about an error can always be found via the StatusID directly.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "StatusID.Code removed in AS6 - use StatusID value directly for error info"
+        },
+        // mapp AlarmX - MpAlarmXListUIConnectType.Language removed
+        {
+            id: "member_mpalarmxlistuiconnect_language",
+            structType: "MpAlarmXListUIConnectType",
+            memberName: "Language",
+            pattern: "(MpAlarmXListUIConnect\\w*)\\.Language\\b",
+            severity: "warning",
+            description: "MpAlarmXListUIConnectType.Language removed in AS6",
+            notes: "The language and unit are now specified directly on the function block inputs (Language, MeasurementSystem).",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpAlarmXListUIConnectType.Language removed - set language on FB input directly"
+        },
+        // mapp AlarmX - MpAlarmXHistoryUIDetailsType.DataDescriptions/DataValues removed
+        {
+            id: "member_mpalarmxhistoryuidetails_datadescriptions",
+            structType: "MpAlarmXHistoryUIDetailsType",
+            memberName: "DataDescriptions",
+            pattern: "(MpAlarmXHistoryUIDetails\\w*)\\.DataDescriptions\\b",
+            severity: "warning",
+            description: "MpAlarmXHistoryUIDetailsType.DataDescriptions removed in AS6",
+            notes: "Parameters 'DataDescriptions' and 'DataValues' were reserved in 5.x for later use and removed with 6.x.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpAlarmXHistoryUIDetailsType.DataDescriptions removed in AS6 - was reserved, no replacement"
+        },
+        {
+            id: "member_mpalarmxhistoryuidetails_datavalues",
+            structType: "MpAlarmXHistoryUIDetailsType",
+            memberName: "DataValues",
+            pattern: "(MpAlarmXHistoryUIDetails\\w*)\\.DataValues\\b",
+            severity: "warning",
+            description: "MpAlarmXHistoryUIDetailsType.DataValues removed in AS6",
+            notes: "Parameters 'DataDescriptions' and 'DataValues' were reserved in 5.x for later use and removed with 6.x.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpAlarmXHistoryUIDetailsType.DataValues removed in AS6 - was reserved, no replacement"
+        },
+        // mapp Com - MpComLoggerUILoggerListType.ErrorNumber removed
+        {
+            id: "member_mpcomloggeruiloggerlist_errornumber",
+            structType: "MpComLoggerUILoggerListType",
+            memberName: "ErrorNumber",
+            pattern: "(MpComLoggerUILoggerList\\w*)\\.ErrorNumber\\b",
+            severity: "warning",
+            description: "MpComLoggerUILoggerListType.ErrorNumber removed in AS6",
+            notes: "Since the error number does not provide any additional useful information, the parameter has been removed. Parameter 'StatusID' provides additional information.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpComLoggerUILoggerListType.ErrorNumber removed in AS6 - use StatusID instead"
+        },
+        // mapp UserX - MpUserXSignatureUIConnectType.SignAction removed
+        {
+            id: "member_mpuserxsignatureuiconnect_signaction",
+            structType: "MpUserXSignatureUIConnectType",
+            memberName: "SignAction",
+            pattern: "(MpUserXSignatureUIConnect\\w*)\\.SignAction\\b",
+            severity: "warning",
+            description: "MpUserXSignatureUIConnectType.SignAction removed in AS6",
+            notes: "Parameter 'SignAction' no longer exists. The value is used in input parameter 'SignAction' of MpUserXSignatureUI function block directly.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpUserXSignatureUIConnectType.SignAction removed - use MpUserXSignatureUI.SignAction FB input"
+        },
+        // mapp UserX - AccessRights removed from role types
+        {
+            id: "member_mpuserxmgruirole_accessrights",
+            structType: "MpUserXMgrUIRole",
+            memberName: "AccessRights",
+            pattern: "(MpUserXMgrUIRole\\w*)\\.AccessRights\\b",
+            severity: "warning",
+            description: "AccessRights removed from MpUserX role data types in AS6",
+            notes: "Access rights are handled with 6.x via OPC UA. Parameter 'AccessRights' has been removed from MpUserXMgrUIRoleInfoType, MpUserXMgrUIRoleDlgType, and MpUserXMgrUIRoleCreateDlgType.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpUserX role AccessRights removed in AS6 - rights now handled via OPC UA"
+        },
+        // mapp UserX - MpUserXMgrUIUserListType.UserOption removed
+        {
+            id: "member_mpuserxmgruiuserlist_useroption",
+            structType: "MpUserXMgrUIUserListType",
+            memberName: "UserOption",
+            pattern: "(MpUserXMgrUIUserList\\w*)\\.UserOption\\b",
+            severity: "warning",
+            description: "MpUserXMgrUIUserListType.UserOption removed in AS6",
+            notes: "Parameter 'UserOption' no longer exists in MpUserXMgrUIUserListType.",
+            removedIn: "AS6.0",
+            autoComment: true,
+            todoMessage: "MpUserXMgrUIUserListType.UserOption removed in AS6"
         }
+    ],
+
+    // ==========================================
+    // INFO STRUCTURE TYPE RENAMES (mapp Services 5.x → 6.0)
+    // ==========================================
+    // Info structure types were split per FB in AS6. Many FBs shared one info type in 5.x,
+    // now each has its own. Auto-replace where mapping is unambiguous.
+    infoTypeRenames: [
+        // Unambiguous renames (1:1 mapping - safe to auto-replace)
+        { old: 'MpAuditTrailInfoType', new: 'MpAuditRegParInfoType', library: 'MpAudit', fb: 'MpAuditRegPar', notes: 'Info structure renamed for MpAuditRegPar' },
+        { old: 'MpFileInfoType', new: 'MpFileManagerUIInfoType', library: 'MpFile', fb: 'MpFileManagerUI', notes: 'Info structure renamed for MpFileManagerUI' },
+        { old: 'MpIOInfoType', new: 'MpIOImportUIInfoType', library: 'MpIO', fb: 'MpIOImportUI', notes: 'Info structure renamed for MpIOImportUI' },
+        // Split types (1:N mapping - warn only, user must choose correct replacement)
+        // MpAlarmXInfoType split into 5 types
+        { old: 'MpAlarmXInfoType', new: null, library: 'MpAlarmX', fb: null, isSplit: true, 
+          replacements: ['MpAlarmXCoreInfoType', 'MpAlarmXHistoryInfoType', 'MpAlarmXAlarmControlInfoType', 'MpAlarmXHistoryUIInfoType', 'MpAlarmXListUIInfoType'],
+          notes: 'MpAlarmXInfoType split into per-FB types: MpAlarmXCoreInfoType (MpAlarmXCore), MpAlarmXHistoryInfoType (MpAlarmXHistory), MpAlarmXAlarmControlInfoType (MpAlarmXAlarmControl), MpAlarmXHistoryUIInfoType (MpAlarmXHistoryUI), MpAlarmXListUIInfoType (MpAlarmXListUI)' },
+        // MpAuditInfoType split into 2 types
+        { old: 'MpAuditInfoType', new: null, library: 'MpAudit', fb: null, isSplit: true,
+          replacements: ['MpAuditTrailUIInfoType', 'MpAuditExportInfoType'],
+          notes: 'MpAuditInfoType split into: MpAuditTrailUIInfoType (MpAuditTrailUI), MpAuditExportInfoType (MpAuditExport)' },
+        // MpCodeBoxInfoType split into 2 types
+        { old: 'MpCodeBoxInfoType', new: null, library: 'MpCodeBox', fb: null, isSplit: true,
+          replacements: ['MpCodeBoxProgramControlInfoType', 'MpCodeBoxManagerInfoType'],
+          notes: 'MpCodeBoxInfoType split into: MpCodeBoxProgramControlInfoType (MpCodeBoxProgramControl), MpCodeBoxManagerInfoType (MpCodeBoxManager)' },
+        // MpDataInfoType split into 3 types
+        { old: 'MpDataInfoType', new: null, library: 'MpData', fb: null, isSplit: true,
+          replacements: ['MpDataRegParInfoType', 'MpDataStatisticsUIInfoType', 'MpDataTableUIInfoType'],
+          notes: 'MpDataInfoType split into: MpDataRegParInfoType (MpDataRegPar), MpDataStatisticsUIInfoType (MpDataStatisticsUI), MpDataTableUIInfoType (MpDataTableUI)' },
+        // MpPackMLUIInfoType split into 2 types
+        { old: 'MpPackMLUIInfoType', new: null, library: 'MpPackML', fb: null, isSplit: true,
+          replacements: ['MpPackMLStatisticsUIInfoType', 'MpPackMLBasicUIInfoType'],
+          notes: 'MpPackMLUIInfoType split into: MpPackMLStatisticsUIInfoType (MpPackMLStatisticsUI), MpPackMLBasicUIInfoType (MpPackMLBasicUI)' },
+        // MpRecipeInfoType split into 3 types
+        { old: 'MpRecipeInfoType', new: null, library: 'MpRecipe', fb: null, isSplit: true,
+          replacements: ['MpRecipeUIInfoType', 'MpRecipeRegParInfoType', 'MpRecipeRegParSyncInfoType'],
+          notes: 'MpRecipeInfoType split into: MpRecipeUIInfoType (MpRecipeUI), MpRecipeRegParInfoType (MpRecipeRegPar), MpRecipeRegParSyncInfoType (MpRecipeRegParSync)' },
+        // MpUserXInfoType split into 4 types
+        { old: 'MpUserXInfoType', new: null, library: 'MpUserX', fb: null, isSplit: true,
+          replacements: ['MpUserXLoginUIInfoType', 'MpUserXManagerUIInfoType', 'MpUserXSignatureUIInfoType', 'MpUserXSignatureInfoType'],
+          notes: 'MpUserXInfoType split into: MpUserXLoginUIInfoType (MpUserXLoginUI), MpUserXManagerUIInfoType (MpUserXManagerUI), MpUserXSignatureUIInfoType (MpUserXSignatureUI), MpUserXSignatureInfoType (MpUserXSignature)' }
     ],
 
     // ==========================================
@@ -2362,7 +2999,95 @@ const DeprecationDatabase = {
                 ]
             }
         ];
-    }
+    },
+
+    // Configuration file transform rules for mapp Services AS4 → AS6
+    // These rules define XML element removals and renames in mapp config files
+    configTransformRules: [
+        {
+            id: 'mpalarmx_language_removed',
+            fbType: 'MpAlarmXCore',
+            filePattern: /MpAlarmXCore/i,
+            action: 'remove_element',
+            elementPath: 'Language',
+            description: 'Language element removed from MpAlarmXCore config in AS6',
+            notes: 'Language is now set at runtime, not in config'
+        },
+        {
+            id: 'mpalarmx_datadescriptions_removed',
+            fbType: 'MpAlarmXCore',
+            filePattern: /MpAlarmXCore/i,
+            action: 'remove_element',
+            elementPath: 'DataDescriptions',
+            description: 'DataDescriptions element removed from MpAlarmXCore config in AS6',
+            notes: 'Data descriptions handled differently in AS6'
+        },
+        {
+            id: 'mpalarmx_datavalues_removed',
+            fbType: 'MpAlarmXCore',
+            filePattern: /MpAlarmXCore/i,
+            action: 'remove_element',
+            elementPath: 'DataValues',
+            description: 'DataValues element removed from MpAlarmXCore config in AS6',
+            notes: 'Data values handled differently in AS6'
+        },
+        {
+            id: 'mpcom_errornumber_removed',
+            fbType: 'MpComConfigManager',
+            filePattern: /MpCom/i,
+            action: 'remove_element',
+            elementPath: 'ErrorNumber',
+            description: 'ErrorNumber element removed from MpCom config in AS6',
+            notes: 'Error reporting changed in AS6'
+        },
+        {
+            id: 'mprecipe_xmlheader_renamed',
+            fbType: 'MpRecipeCore',
+            filePattern: /MpRecipe/i,
+            action: 'rename_element',
+            oldElement: 'XmlHeader',
+            newElement: 'Header',
+            description: 'XmlHeader renamed to Header in MpRecipe config',
+            notes: 'Unified header type in AS6'
+        },
+        {
+            id: 'mprecipe_csvheader_renamed',
+            fbType: 'MpRecipeCore',
+            filePattern: /MpRecipe/i,
+            action: 'rename_element',
+            oldElement: 'CsvHeader',
+            newElement: 'Header',
+            description: 'CsvHeader renamed to Header in MpRecipe config',
+            notes: 'Unified header type in AS6'
+        },
+        {
+            id: 'mpuserx_signaction_removed',
+            fbType: 'MpUserXLoginUI',
+            filePattern: /MpUserX/i,
+            action: 'remove_element',
+            elementPath: 'SignAction',
+            description: 'SignAction element removed from MpUserX config in AS6',
+            notes: 'Sign action functionality removed'
+        },
+        {
+            id: 'mpuserx_accessrights_removed',
+            fbType: 'MpUserXLoginUI',
+            filePattern: /MpUserX/i,
+            action: 'remove_element',
+            elementPath: 'AccessRights',
+            description: 'AccessRights element removed from MpUserX config in AS6',
+            notes: 'Access rights managed differently in AS6'
+        },
+        {
+            id: 'mpuserx_useroption_removed',
+            fbType: 'MpUserXLoginUI',
+            filePattern: /MpUserX/i,
+            action: 'remove_element',
+            elementPath: 'UserOption',
+            description: 'UserOption element removed from MpUserX config in AS6',
+            notes: 'User option functionality removed'
+        }
+    ]
 };
 
 // Export for use in other modules
