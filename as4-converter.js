@@ -4839,6 +4839,29 @@ ${mappingGroups}
     }
     
     /**
+     * Lowercase the built-in mpAlarmX snippet references in alarm message text.
+     *
+     * In AS4 the predefined Level Monitoring snippets may be capitalized
+     * (e.g. {MonitoredValue}, {&LimitText}, {Limit}), but AS6 requires them to be
+     * lowercase ({monitoredvalue}, {&limittext}, {limit}). Only these specific
+     * built-in snippet names are converted - user-defined snippets (which may be
+     * upper or lower case) are left untouched because the match is anchored to the
+     * reserved names inside the {...} reference syntax.
+     */
+    lowercaseBuiltInSnippets(configurationContent) {
+        if (!configurationContent) {
+            return configurationContent;
+        }
+        // Match a snippet reference: '{' an optional '&amp;'/'&' (translatable) prefix,
+        // one of the reserved built-in names, then '}'. Longer names are listed first
+        // so 'MonitoredValue' is preferred over a hypothetical shorter match.
+        return configurationContent.replace(
+            /\{(&amp;|&)?(MonitoredValue|LimitText|Limit)\}/gi,
+            (match, prefix, name) => `{${prefix || ''}${name.toLowerCase()}}`
+        );
+    }
+
+    /**
      * Generate AS6 list file content with alarm definitions and snippets
      */
     generateAS6ListFile(elementId, configurationContent, snippetsContent) {
@@ -4848,11 +4871,14 @@ ${mappingGroups}
             snippetsSection = `\n    <Group ID="mapp.AlarmX.Snippets">${snippetsContent}</Group>`;
         }
         
+        // Built-in snippet names must be lowercase in AS6 alarm message text
+        const normalizedConfiguration = this.lowercaseBuiltInSnippets(configurationContent);
+        
         return `<?xml version="1.0" encoding="utf-8"?>
 <?AutomationStudio FileVersion="4.9"?>
 <Configuration>
   <Element ID="${elementId}_List" Type="mpalarmxlist">
-    <Group ID="mapp.AlarmX.Core.Configuration">${configurationContent}</Group>${snippetsSection}
+    <Group ID="mapp.AlarmX.Core.Configuration">${normalizedConfiguration}</Group>${snippetsSection}
   </Element>
 </Configuration>`;
     }

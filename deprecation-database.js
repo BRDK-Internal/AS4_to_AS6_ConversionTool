@@ -2400,18 +2400,6 @@ const DeprecationDatabase = {
             eol: "2020-12-31"
         },
 
-        // Power Supplies
-        {
-            id: "hw_x20ps2100",
-            name: "X20PS2100",
-            type: "power_supply",
-            severity: "warning",
-            description: "Power supply - aging model",
-            replacement: { name: "X20PS3300", description: "Modern power supply" },
-            notes: "Still supported. Upgrade recommended for new installations.",
-            eol: null
-        },
-
     ],
 
     // ==========================================
